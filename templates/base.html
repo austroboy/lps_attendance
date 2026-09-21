@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Attendance{% endblock %} · LPS</title>
-  <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+  <title>{% block title %}Attendance{% endblock %} · Life Preparatory School</title>
+  <link rel="icon" href="{% static 'img/lps-logo-64.png' %}" type="image/png">
+  <link rel="apple-touch-icon" href="{% static 'img/lps-logo-180.png' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body>
@@ -13,8 +14,8 @@
   <nav class="sidebar" id="sidebar">
     {% with vn=request.resolver_match.view_name slot_type=request.GET.type %}
     <div class="brand">
+      <img src="{% static 'img/lps-logo-64.png' %}" alt="" width="38" height="38">
       <strong>LPS Attendance</strong>
-      <span>Face terminals, timetables, SMS</span>
     </div>
 
     <a href="{% url 'accounts:home' %}" class="{% if vn == 'accounts:home' %}on{% endif %}">Dashboard</a>

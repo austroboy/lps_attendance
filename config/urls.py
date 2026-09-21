@@ -15,7 +15,7 @@ urlpatterns = [
 
     # Browsers ask for this whether or not you link one; answer it instead of
     # filling the log with 404s while you are watching for device traffic.
-    path("favicon.ico", RedirectView.as_view(url=static_url("favicon.svg"), permanent=True)),
+    path("favicon.ico", RedirectView.as_view(url=static_url("img/lps-logo-64.png"), permanent=False)),
 
     path("django-admin/", admin.site.urls),
     path("devices/", include("devices.urls")),

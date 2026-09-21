@@ -3,22 +3,74 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sign in · LPS Attendance</title>
-  <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+  <title>Sign in · Life Preparatory School</title>
+  <link rel="icon" href="{% static 'img/lps-logo-64.png' %}" type="image/png">
+  <link rel="apple-touch-icon" href="{% static 'img/lps-logo-180.png' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
-<body style="display:grid;place-items:center;min-height:100vh;">
-  <div class="card" style="width:min(400px,92vw);">
-    <h1 style="margin-bottom:2px;">LPS Attendance</h1>
-    <p class="muted" style="margin-bottom:18px;">Sign in with the username your school gave you.</p>
-    {% if form.errors %}
-      <div class="notice error">That username and password do not match. Check both and try again.</div>
-    {% endif %}
-    <form method="post">
-      {% csrf_token %}
-      {% include "_form.html" %}
-      <button class="btn" type="submit" style="width:100%;">Sign in</button>
-    </form>
-  </div>
+<body class="auth">
+  <main class="auth-shell">
+
+    <section class="auth-brand" aria-label="Life Preparatory School">
+      <div class="auth-crest">
+        <img src="{% static 'img/lps-logo.png' %}" alt="Life Preparatory School crest" width="300" height="300">
+      </div>
+      <h1 class="auth-school">Life Preparatory School <span class="auth-abbr">LPS</span></h1>
+      <p class="auth-app">Attendance</p>
+    </section>
+
+    <section class="auth-panel">
+      <form method="post" class="auth-form" novalidate>
+        {% csrf_token %}
+        <h2>Sign in</h2>
+        <p class="muted">Use the username and password the school office gave you.</p>
+
+        {% if form.errors %}
+          <div class="notice error" role="alert">
+            That username and password do not match. Check both and try again.
+          </div>
+        {% endif %}
+
+        <div class="form-row">
+          <label for="id_username">Username</label>
+          <input type="text" name="username" id="id_username" class="field"
+                 value="{{ form.username.value|default:'' }}"
+                 autocomplete="username" autocapitalize="none" spellcheck="false"
+                 autofocus required>
+        </div>
+
+        <div class="form-row">
+          <label for="id_password">Password</label>
+          <div class="auth-password">
+            <input type="password" name="password" id="id_password" class="field"
+                   autocomplete="current-password" required>
+            <button type="button" class="auth-reveal" id="reveal"
+                    aria-controls="id_password" aria-pressed="false">Show</button>
+          </div>
+        </div>
+
+        {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+        <button class="btn auth-submit" type="submit">Sign in</button>
+      </form>
+    </section>
+
+  </main>
+
+<script>
+/* Show or hide the password. On a phone, seeing what you typed saves a lot of
+   failed attempts with long IDs like LPS-JS-260044. */
+(function () {
+  const button = document.getElementById("reveal");
+  const field = document.getElementById("id_password");
+  if (!button || !field) return;
+  button.addEventListener("click", () => {
+    const show = field.type === "password";
+    field.type = show ? "text" : "password";
+    button.textContent = show ? "Hide" : "Show";
+    button.setAttribute("aria-pressed", show ? "true" : "false");
+    field.focus();
+  });
+})();
+</script>
 </body>
 </html>

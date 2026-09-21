@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Import teachers{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div><h1>Import teachers</h1>
+    <p>The whole staff list at once. Teachers are matched on employee code, so uploading
+      a corrected file updates them instead of adding them twice.</p></div>
+  <a class="btn" href="{% url 'academics:teacher_import_sample' %}">Download sample Excel</a>
+</div>
+
+<div class="grid c2">
+  <div class="card">
+    <h2>Upload a file</h2>
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}
+      {% include "_form.html" %}
+      <button class="btn" type="submit">Start import</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>What the file needs</h2>
+    <p>An <strong>employee_code</strong> and a <strong>full_name</strong> for every teacher.
+      Everything else — phone, designation, campus, joining date — is optional.</p>
+    <p>Every teacher needs their own code. Phone numbers cannot stand in for one: two
+      teachers can share a number, and one teacher can appear under two spellings of a name.</p>
+    <p>Joining dates are read day first, the way the school writes them: 19/01/2008.</p>
+    <p class="muted">Right now: {{ teachers }} active teacher{{ teachers|pluralize }}.</p>
+  </div>
+</div>
+
+{% if jobs %}
+<div class="card">
+  <h2>Recent teacher imports</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>File</th><th>When</th><th>Status</th><th class="num">Rows</th>
+      <th class="num">Added</th><th class="num">Updated</th><th class="num">Skipped</th><th></th></tr></thead>
+    <tbody>{% for job in jobs %}
+      <tr>
+        <td>{{ job.original_name|default:"—" }}{% if job.dry_run %}
+          <span class="badge LEAVE">check only</span>{% endif %}</td>
+        <td class="muted">{{ job.created_at|date:"j M, H:i" }}</td>
+        <td><span class="badge {% if job.status == 'DONE' %}ok{% elif job.status == 'FAILED' %}bad{% else %}LATE{% endif %}">{{ job.get_status_display }}</span></td>
+        <td class="num">{{ job.total_rows }}</td><td class="num">{{ job.created }}</td>
+        <td class="num">{{ job.updated }}</td><td class="num">{{ job.skipped }}</td>
+        <td><a class="btn ghost small" href="{% url 'academics:import_progress' job.pk %}">Open</a></td>
+      </tr>
+    {% endfor %}</tbody></table></div>
+</div>
+{% endif %}
+
+{% endblock %}

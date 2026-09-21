@@ -627,3 +627,120 @@ class RollNumberTests(TestCase):
         self.client.force_login(admin)
         html = self.client.get("/academics/students/").content.decode()
         self.assertEqual(html.count("LPS-JS-260044"), 1)
+
+
+class TeacherImportTests(TestCase):
+    HEAD = ["employee_code", "full_name", "phone", "designation", "campus",
+            "joined_on", "device_user_id", "is_active"]
+
+    def book(self, rows, header=None):
+        return workbook_bytes(rows, header=header or self.HEAD)
+
+    def run_teachers(self, content, name="staff.xlsx", **kw):
+        job = ImportJob(kind="TEACHERS", original_name=name, **kw)
+        job.upload.save(name, ContentFile(content), save=False)
+        job.save()
+        run_job(job)
+        job.refresh_from_db()
+        return job
+
+    def test_teachers_are_created_and_matched_on_code(self):
+        rows = [["T-1", "Roksana Parveen", "01712819803", "AC", "Campus : 04", "19/1/2008", "", "yes"],
+                ["T-2", "Salina Islam", "1635020164", "AT", "Moinertek", "", "", ""]]
+        job = self.run_teachers(self.book(rows))
+        self.assertEqual((job.status, job.created, job.skipped), ("DONE", 2, 0))
+        t = Teacher.objects.get(employee_code="T-2")
+        self.assertEqual(t.phone, "01635020164")     # lost zero restored
+        self.assertIsNone(t.joined_on)               # blank stays blank, not "today"
+
+        again = self.run_teachers(self.book(rows), name="again.xlsx")
+        self.assertEqual((again.created, again.updated), (0, 2))
+        self.assertEqual(Teacher.objects.count(), 2)
+
+    def test_the_schools_own_headers_are_understood(self):
+        header = ["USERID", "Phone number", "Name", "Employee type", "Designation", "Joining date"]
+        job = self.run_teachers(self.book([["T-9", "01712345678", "Ayreen Jahan",
+                                            "Campus : 04", "AC (2IC)", "3/11/2008"]], header=header))
+        t = Teacher.objects.get(employee_code="T-9")
+        self.assertEqual((t.full_name, t.campus, t.designation), ("Ayreen Jahan", "Campus : 04", "AC (2IC)"))
+        self.assertEqual(t.joined_on.isoformat(), "2008-11-03")
+
+    def test_rows_without_a_code_are_refused_not_guessed(self):
+        job = self.run_teachers(self.book([["", "No Code", "01712345678", "", "", "", "", ""]]))
+        self.assertEqual((job.created, job.skipped), (0, 1))
+        self.assertIn("no employee code", job.problems[0])
+
+    def test_a_shared_phone_does_not_merge_two_teachers(self):
+        rows = [["T-1", "Shamim Shorif", "01764127113", "AT", "", "", "", ""],
+                ["T-2", "Somaiya Akter", "01764127113", "AT", "", "", "", ""]]
+        self.run_teachers(self.book(rows))
+        self.assertEqual(Teacher.objects.filter(phone="01764127113").count(), 2)
+
+    def test_a_reupload_never_wipes_a_device_id(self):
+        self.run_teachers(self.book([["T-1", "A", "", "", "", "", "", ""]]))
+        Teacher.objects.filter(employee_code="T-1").update(device_user_id="7001")
+        self.run_teachers(self.book([["T-1", "A renamed", "", "", "", "", "", ""]]), name="b.xlsx")
+        t = Teacher.objects.get(employee_code="T-1")
+        self.assertEqual((t.full_name, t.device_user_id), ("A renamed", "7001"))
+
+    def test_dry_run_writes_nothing(self):
+        job = self.run_teachers(self.book([["T-1", "A", "", "", "", "", "", ""]]), dry_run=True)
+        self.assertEqual((job.status, job.created), ("DONE", 1))
+        self.assertFalse(Teacher.objects.exists())
+
+    def test_dates_are_read_day_first(self):
+        from .teacher_imports import parse_date
+        self.assertEqual(parse_date("9/5/2022").isoformat(), "2022-05-09")
+        self.assertEqual(parse_date("16-07-2017").isoformat(), "2017-07-16")
+        self.assertEqual(parse_date("2008-10-01 00:00:00").isoformat(), "2008-10-01")
+        self.assertEqual(parse_date("3/5/22").isoformat(), "2022-05-03")
+        with self.assertRaises(ValueError):
+            parse_date("sometime in 2010")
+
+    def test_logins_are_left_to_the_background_when_run_inline(self):
+        job = ImportJob(kind="TEACHERS", original_name="s.xlsx", create_logins=True)
+        job.upload.save("s.xlsx", ContentFile(self.book([["T-1", "A", "", "", "", "", "", ""]])), save=False)
+        job.save()
+        run_job(job, allow_logins=False)
+        job.refresh_from_db()
+        self.assertEqual(job.created, 1)
+        self.assertIsNone(Teacher.objects.get().user)
+        self.assertIn("create_logins --teachers", job.problems[0])
+
+
+class CreateLoginsCommandTests(TestCase):
+    def test_students_and_teachers_get_their_own_ids_as_logins(self):
+        from django.core.management import call_command
+        from io import StringIO
+
+        six = SchoolClass.objects.create(name="Six", order=8)
+        section = Section.objects.create(school_class=six, name="A")
+        Student.objects.create(admission_no="LPS-JS-1", full_name="Kid", section=section)
+        Student.objects.create(admission_no="LPS-JS-2", full_name="Gone", section=section,
+                               is_active=False)
+        Teacher.objects.create(employee_code="LPS-T-0001", full_name="Sir")
+
+        call_command("create_logins", "--students", "--teachers", stdout=StringIO())
+        call_command("create_logins", "--students", "--teachers", stdout=StringIO())  # idempotent
+
+        from accounts.models import User
+        self.assertTrue(self.client.login(username="LPS-JS-1", password="LPS-JS-1"))
+        self.assertTrue(self.client.login(username="LPS-T-0001", password="LPS-T-0001"))
+        self.assertEqual(User.objects.get(username="LPS-T-0001").role, "TEACHER")
+        self.assertFalse(User.objects.filter(username="LPS-JS-2").exists())   # inactive: no login
+        self.assertEqual(User.objects.count(), 2)
+
+
+class BrandingTests(TestCase):
+    def test_login_page_names_the_school_and_shows_the_crest(self):
+        html = self.client.get("/login/").content.decode()
+        self.assertIn("Life Preparatory School", html)
+        self.assertIn("img/lps-logo.png", html)
+
+    def test_the_old_tagline_is_gone(self):
+        from accounts.models import Role, User
+        admin = User.objects.create(username="boss", role=Role.SUPERADMIN,
+                                    is_staff=True, is_superuser=True)
+        self.client.force_login(admin)
+        html = self.client.get("/").content.decode()
+        self.assertNotIn("Face terminals, timetables, SMS", html)

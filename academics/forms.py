@@ -66,7 +66,7 @@ class TeacherForm(StyledFormMixin, forms.ModelForm):
 
     class Meta:
         model = Teacher
-        fields = ["employee_code", "full_name", "designation", "phone",
+        fields = ["employee_code", "full_name", "designation", "campus", "phone",
                   "device_user_id", "is_active", "joined_on"]
         widgets = {"joined_on": DateInput()}
 
@@ -154,3 +154,21 @@ class BulkStudentImportForm(StyledFormMixin, forms.ModelForm):
             raise forms.ValidationError(
                 f"That file is larger than {MAX_UPLOAD_MB} MB. Split it into two uploads.")
         return upload
+
+
+class BulkTeacherImportForm(BulkStudentImportForm):
+    upload = forms.FileField(
+        label="Spreadsheet",
+        help_text="Excel (.xlsx) or CSV with an employee_code and full_name column.")
+
+    class Meta(BulkStudentImportForm.Meta):
+        labels = {
+            "dry_run": "Check the file first, do not save anything",
+            "create_logins": "Create a teacher login for each new row",
+            "deactivate_missing": "Mark teachers missing from this file as inactive",
+        }
+        help_texts = {
+            "create_logins": "Username and first password: the employee code. Takes a "
+                             "few minutes, so it happens in the background.",
+            "deactivate_missing": "Only use this with the full staff list.",
+        }

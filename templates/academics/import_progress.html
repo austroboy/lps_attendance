@@ -8,8 +8,13 @@
       by {{ job.created_by.get_full_name|default:job.created_by.username }}{% endif %}.
       {% if job.dry_run %}This is a check only — nothing will be saved.{% endif %}</p></div>
   <div class="btn-row">
-    <a class="btn ghost" href="{% url 'academics:student_import' %}">New import</a>
-    <a class="btn ghost" href="{% url 'academics:student_list' %}">Students</a>
+    {% if job.is_teachers %}
+      <a class="btn ghost" href="{% url 'academics:teacher_import' %}">New import</a>
+      <a class="btn ghost" href="{% url 'academics:teacher_list' %}">Teachers</a>
+    {% else %}
+      <a class="btn ghost" href="{% url 'academics:student_import' %}">New import</a>
+      <a class="btn ghost" href="{% url 'academics:student_list' %}">Students</a>
+    {% endif %}
   </div>
 </div>
 
@@ -71,15 +76,15 @@
 </div>
 
 <div class="card" id="problem-card" {% if not job.problems %}hidden{% endif %}>
-  <h2>Rows that were skipped</h2>
-  <p class="muted">Everything else was imported. Fix these rows and upload the file again —
-    the students that did go in will be updated, not duplicated.</p>
+  <h2>Worth a look</h2>
+  <p class="muted">Everything else went in. Fix these rows and upload the file again —
+    whoever was already imported is updated, not added twice.</p>
   <ul id="problem-list" class="problem-list">
     {% for problem in job.problems %}<li>{{ problem }}</li>{% endfor %}
   </ul>
 </div>
 
-{% if job.status == "DONE" and not job.dry_run %}
+{% if job.status == "DONE" and not job.dry_run and not job.is_teachers %}
 <div class="card">
   <h3>What next</h3>
   <p class="muted">Students are in, but they will not produce attendance until two things are

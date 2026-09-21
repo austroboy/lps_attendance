@@ -119,13 +119,17 @@ class Teacher(models.Model):
     employee_code = models.CharField(max_length=30, unique=True)
     full_name = models.CharField(max_length=120)
     designation = models.CharField(max_length=80, blank=True)
+    campus = models.CharField(max_length=60, blank=True, db_index=True,
+                              help_text="Which campus or branch, if the school has several.")
     phone = models.CharField(max_length=20, blank=True)
     # The user id that is actually enrolled on the face/finger terminal.
     device_user_id = models.CharField(
         max_length=32, blank=True, db_index=True,
         help_text="User ID enrolled on the attendance terminal (the number shown on the device).")
     is_active = models.BooleanField(default=True)
-    joined_on = models.DateField(default=timezone.localdate)
+    # Nullable: an unknown joining date is better left blank than set to the day
+    # the spreadsheet happened to be imported.
+    joined_on = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["full_name"]

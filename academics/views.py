@@ -11,6 +11,7 @@ from common import csv_response, paginate
 
 from .forms import (
     BulkStudentImportForm,
+    BulkTeacherImportForm,
     ClassAccessForm,
     GroupForm,
     HolidayForm,
@@ -22,7 +23,7 @@ from .forms import (
     TeacherForm,
     VersionForm,
 )
-from .import_models import ImportJob, ImportStatus
+from .import_models import ImportJob, ImportKind, ImportStatus
 from .roster import (
     can_edit_student,
     cancel_face_enrolment,
@@ -407,7 +408,8 @@ def student_import(request):
 
     return render(request, "academics/student_import.html", {
         "form": form,
-        "jobs": ImportJob.objects.select_related("created_by")[:8],
+        "jobs": ImportJob.objects.filter(kind=ImportKind.STUDENTS)
+                                .select_related("created_by")[:8],
         "classes": SchoolClass.objects.count(),
         "sections": Section.objects.count(),
         "students": Student.objects.filter(is_active=True).count(),
@@ -498,7 +500,7 @@ def import_run_now(request, pk):
 
     _reset(job)
     try:
-        run_job(job)
+        run_job(job, allow_logins=False)
     except Exception as exc:  # noqa: BLE001 - the job row carries the detail
         log.exception("inline import %s failed", job.pk)
         job.refresh_from_db()
@@ -548,13 +550,71 @@ def import_sample(request):
 def teacher_list(request):
     queryset = Teacher.objects.all()
     search = request.GET.get("q", "").strip()
+    campus = request.GET.get("campus", "")
+    designation = request.GET.get("designation", "")
+    inactive = request.GET.get("inactive")
     if search:
         queryset = queryset.filter(
             Q(full_name__icontains=search) | Q(employee_code__icontains=search)
-            | Q(device_user_id__icontains=search))
-    return render(request, "academics/teacher_list.html",
-                  {"page": paginate(request, queryset), "search": search,
-                   "total": queryset.count()})
+            | Q(device_user_id__icontains=search) | Q(phone__icontains=search))
+    if campus:
+        queryset = queryset.filter(campus=campus)
+    if designation:
+        queryset = queryset.filter(designation=designation)
+    queryset = queryset.filter(is_active=not inactive)
+
+    if request.GET.get("export"):
+        # Same columns as the import, so an export is a ready-made re-upload.
+        return csv_response(
+            "teachers.csv",
+            ["employee_code", "full_name", "phone", "designation", "campus",
+             "joined_on", "device_user_id", "is_active"],
+            [[t.employee_code, t.full_name, t.phone, t.designation, t.campus,
+              t.joined_on.strftime("%d/%m/%Y") if t.joined_on else "",
+              t.device_user_id, "yes" if t.is_active else "no"] for t in queryset])
+
+    return render(request, "academics/teacher_list.html", {
+        "page": paginate(request, queryset), "search": search, "total": queryset.count(),
+        "campus": campus, "designation": designation, "inactive": inactive,
+        "campuses": Teacher.objects.exclude(campus="").values_list("campus", flat=True)
+                                   .distinct().order_by("campus"),
+        "designations": Teacher.objects.exclude(designation="")
+                                       .values_list("designation", flat=True)
+                                       .distinct().order_by("designation"),
+    })
+
+
+@admin_required
+def teacher_import(request):
+    """Bulk teacher upload. Same pipeline as students, keyed on employee code."""
+    form = BulkTeacherImportForm(request.POST or None, request.FILES or None)
+    if request.method == "POST" and form.is_valid():
+        job = form.save(commit=False)
+        job.kind = ImportKind.TEACHERS
+        job.original_name = form.cleaned_data["upload"].name[:200]
+        job.created_by = request.user
+        job.save()
+        _dispatch(request, job)
+        return redirect("academics:import_progress", pk=job.pk)
+
+    return render(request, "academics/teacher_import.html", {
+        "form": form,
+        "jobs": ImportJob.objects.filter(kind=ImportKind.TEACHERS)
+                                .select_related("created_by")[:8],
+        "teachers": Teacher.objects.filter(is_active=True).count(),
+    })
+
+
+@admin_required
+def teacher_import_sample(request):
+    from .sample import build_teacher_sample_workbook
+
+    response = HttpResponse(
+        build_teacher_sample_workbook(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    stamp = timezone.localdate().isoformat()
+    response["Content-Disposition"] = f'attachment; filename="teacher-import-{stamp}.xlsx"'
+    return response
 
 
 @admin_required

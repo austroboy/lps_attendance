@@ -212,3 +212,96 @@ def _add_reference_sheet(workbook):
         for section in sections:
             sheet.cell(row=row, column=1, value=f"   {section}").font = Font(size=10)
             row += 1
+
+
+# ---------------------------------------------------------------------------
+# Teachers
+# ---------------------------------------------------------------------------
+TEACHER_HEADERS = [
+    ("employee_code", 15, "Required. Unique. Re-uploading the same code updates that teacher."),
+    ("full_name", 28, "Required."),
+    ("phone", 15, "Optional. 01XXXXXXXXX."),
+    ("designation", 16, "Optional. AT, ST, AC, Coordinator…"),
+    ("campus", 14, "Optional. Which campus or branch."),
+    ("joined_on", 13, "Optional. Day first: 19/01/2008 or 2008-01-19."),
+    ("device_user_id", 15, "Optional. Set later from the terminal if unknown."),
+    ("is_active", 10, "yes or no. Blank means yes."),
+]
+TEACHER_REQUIRED = {"employee_code", "full_name"}
+
+
+def build_teacher_sample_workbook() -> bytes:
+    from .models import Teacher
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Teachers"
+    sheet.freeze_panes = "A2"
+
+    for index, (name, width, note) in enumerate(TEACHER_HEADERS, start=1):
+        letter = get_column_letter(index)
+        sheet.column_dimensions[letter].width = width
+        head = sheet.cell(row=1, column=index, value=name)
+        head.font = Font(bold=True, color="FFFFFF", size=11)
+        head.fill = REQ_FILL if name in TEACHER_REQUIRED else HEAD_FILL
+        head.alignment = Alignment(horizontal="center", vertical="center")
+        comment = Comment(note, "LPS Attendance")
+        comment.width, comment.height = 260, 90
+        head.comment = comment
+        if name in ("employee_code", "phone", "device_user_id", "joined_on"):
+            dimension = sheet.column_dimensions[letter]
+            dimension.number_format = "@"
+            dimension.customFormat = True
+    sheet.row_dimensions[1].height = 22
+
+    rows = []
+    for teacher in Teacher.objects.filter(is_active=True)[:3]:
+        rows.append([teacher.employee_code, teacher.full_name, teacher.phone,
+                     teacher.designation, teacher.campus,
+                     teacher.joined_on.strftime("%d/%m/%Y") if teacher.joined_on else "",
+                     teacher.device_user_id, "yes"])
+    if not rows:
+        rows = [
+            ["LPS-T-0001", "Khandaker Salim Reza", "01752526472", "Coordinator",
+             "Campus : 04", "01/10/2008", "", "yes"],
+            ["LPS-T-0002", "Roksana Parveen", "01712819803", "AC", "Campus : 04",
+             "19/01/2008", "", "yes"],
+        ]
+    for offset, row in enumerate(rows, start=2):
+        for column, value in enumerate(row, start=1):
+            cell = sheet.cell(row=offset, column=column, value=value)
+            if TEACHER_HEADERS[column - 1][0] in ("employee_code", "phone", "device_user_id", "joined_on"):
+                cell.number_format = "@"
+
+    campuses = list(Teacher.objects.exclude(campus="").values_list("campus", flat=True)
+                    .distinct()[:30])
+    if campuses:
+        joined = ",".join(c.replace(",", " ") for c in campuses)
+        if len(joined) <= 240:
+            rule = DataValidation(type="list", formula1=f'"{joined}"', allow_blank=True)
+            rule.prompt = "Pick one, or type a new campus."
+            sheet.add_data_validation(rule)
+            rule.add("E2:E2000")
+
+    notes = workbook.create_sheet("How to use this")
+    notes.column_dimensions["A"].width = 100
+    for row, (text, bold) in enumerate([
+        ("How to fill this in", True),
+        ("", False),
+        ("One teacher per row, from row 2 down. Keep row 1 exactly as it is.", False),
+        ("employee_code and full_name are required. The code is how a teacher is "
+         "recognised on the next upload, so keep it the same every time.", False),
+        ("Phone numbers are not used to tell teachers apart — two teachers can "
+         "share one — so every row needs its own code.", False),
+        ("A blank device_user_id or joining date on a re-upload never erases what "
+         "is already saved.", False),
+        ("Tick 'Check the file first' when you upload to see every problem without "
+         "saving anything.", False),
+    ], start=1):
+        cell = notes.cell(row=row, column=1, value=text)
+        cell.font = Font(bold=bold, size=13 if bold else 10)
+        cell.alignment = Alignment(wrap_text=True, vertical="top")
+
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()

@@ -571,3 +571,164 @@ details summary { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* =========================================================================
+   Sign-in page
+   =========================================================================
+   The one place the school's own identity leads: the crest's green and the
+   lime of its swoosh, not the admin palette. Everything else stays quiet so
+   the crest is the thing you remember.
+   ========================================================================= */
+.auth {
+  --school: #056839;
+  --school-deep: #03502b;
+  --lime: #92c536;
+  background: #fff;
+}
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(320px, 1fr) minmax(360px, 1fr);
+}
+
+/* ---- brand side ---- */
+.auth-brand {
+  position: relative;
+  overflow: hidden;
+  background: var(--school);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 32px;
+}
+/* The crest's lime swoosh, carried out to the edge of the page. Sized in
+   pixels from the bottom edge, with matching padding on the panel, so it can
+   never run through the school's name however short the window. */
+.auth-brand { padding-bottom: 150px; }
+.auth-brand::before,
+.auth-brand::after {
+  content: "";
+  position: absolute;
+  left: -35%;
+  right: -35%;
+  height: 420px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.auth-brand::before { bottom: -310px; border-top: 22px solid var(--lime); }
+.auth-brand::after  { bottom: -334px; background: var(--school-deep); }
+.auth-brand > * { position: relative; z-index: 1; }
+
+/* A tile rather than a circle: the crest is square-shouldered, and a circle
+   either clips its top corners or shrinks it to fit. */
+.auth-crest {
+  width: clamp(150px, 20vw, 210px);
+  aspect-ratio: 1;
+  border-radius: 28px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  box-shadow: 0 0 0 6px rgba(255, 255, 255, .16), 0 18px 40px rgba(0, 0, 0, .22);
+  margin-bottom: 28px;
+}
+.auth-crest img { width: 86%; height: auto; }
+
+.auth-school {
+  font-size: clamp(1.55rem, 2.6vw, 2.2rem);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -.01em;
+  margin: 0;
+  max-width: 14ch;
+}
+.auth-abbr {
+  display: block;
+  margin-top: 10px;
+  font-size: .55em;
+  font-weight: 600;
+  letter-spacing: .32em;
+  padding-left: .32em;           /* balance the trailing letter-space */
+  color: var(--lime);
+}
+.auth-app {
+  margin: 14px 0 0;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, .8);
+}
+
+/* ---- form side ---- */
+.auth-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 28px;
+}
+.auth-form { width: min(380px, 100%); }
+.auth-form h2 { font-size: 1.6rem; margin-bottom: 4px; }
+.auth-form > .muted { margin-bottom: 22px; }
+.auth-form .form-row { max-width: none; margin-bottom: 16px; }
+.auth-form .field {
+  padding: 10px 12px;
+  font-size: 1rem;
+  border-radius: 6px;
+}
+.auth-form .field:focus {
+  outline: none;
+  border-color: var(--school);
+  box-shadow: 0 0 0 3px rgba(5, 104, 57, .18);
+}
+.auth-password { position: relative; }
+.auth-password .field { padding-right: 64px; }
+.auth-reveal {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--school);
+  font: inherit;
+  font-size: .85rem;
+  font-weight: 600;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.auth-reveal:focus-visible { outline: 2px solid var(--school); outline-offset: 0; }
+.auth-submit {
+  width: 100%;
+  padding: 11px 14px;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 6px;
+  background: var(--school);
+  border-color: var(--school);
+  margin-top: 6px;
+}
+.auth-submit:hover { background: var(--school-deep); border-color: var(--school-deep); }
+
+@media (max-width: 760px) {
+  .auth-shell { grid-template-columns: 1fr; min-height: 100dvh; }
+  .auth-brand { padding: 32px 24px 96px; }
+  .auth-brand::before,
+  .auth-brand::after { height: 260px; }
+  .auth-brand::before { bottom: -196px; border-top-width: 14px; }
+  .auth-brand::after  { bottom: -211px; }
+  .auth-crest { width: 120px; border-radius: 20px; margin-bottom: 16px; }
+  .auth-panel { align-items: flex-start; padding: 28px 20px 40px; }
+}
+
+/* ---- sidebar crest ---- */
+.sidebar .brand { display: flex; align-items: center; gap: 10px; }
+.sidebar .brand img {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  background: #fff;
+  padding: 3px;
+  flex: 0 0 auto;
+}
+.sidebar .brand strong { line-height: 1.2; }

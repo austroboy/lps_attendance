@@ -35,6 +35,8 @@ urlpatterns = [
 
     path("teachers/", views.teacher_list, name="teacher_list"),
     path("teachers/new/", views.teacher_form, name="teacher_new"),
+    path("teachers/import/", views.teacher_import, name="teacher_import"),
+    path("teachers/import/sample.xlsx", views.teacher_import_sample, name="teacher_import_sample"),
     path("teachers/<int:pk>/", views.teacher_form, name="teacher_edit"),
 
     path("access/", views.access_list, name="access_list"),

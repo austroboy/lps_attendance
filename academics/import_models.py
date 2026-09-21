@@ -17,7 +17,14 @@ class ImportStatus(models.TextChoices):
     FAILED = "FAILED", "Failed"
 
 
+class ImportKind(models.TextChoices):
+    STUDENTS = "STUDENTS", "Students"
+    TEACHERS = "TEACHERS", "Teachers"
+
+
 class ImportJob(models.Model):
+    kind = models.CharField(max_length=10, choices=ImportKind.choices,
+                            default=ImportKind.STUDENTS, db_index=True)
     upload = models.FileField(upload_to="imports/%Y/%m/")
     original_name = models.CharField(max_length=200, blank=True)
     status = models.CharField(max_length=8, choices=ImportStatus.choices,
@@ -28,10 +35,10 @@ class ImportJob(models.Model):
         help_text="Check the file and report problems without writing anything.")
     create_logins = models.BooleanField(
         default=False,
-        help_text="Also create a student login for each new row.")
+        help_text="Also create a login for each new row.")
     deactivate_missing = models.BooleanField(
         default=False,
-        help_text="Mark any student not in the file as inactive.")
+        help_text="Mark anyone not in the file as inactive.")
 
     total_rows = models.IntegerField(default=0)
     processed = models.IntegerField(default=0)
@@ -73,6 +80,10 @@ class ImportJob(models.Model):
     @property
     def is_running(self):
         return self.status in (ImportStatus.PENDING, ImportStatus.RUNNING)
+
+    @property
+    def is_teachers(self):
+        return self.kind == ImportKind.TEACHERS
 
     @property
     def created_anything(self):

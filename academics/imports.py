@@ -61,12 +61,23 @@ class ImportError_(Exception):
     """Something wrong with the file itself, not with one row."""
 
 
-def _norm_header(value):
+def _header_key(value):
     if value is None:
         return ""
     text = str(value).strip().lower().replace(" ", "_")
-    text = re.sub(r"[^a-z0-9_]", "", text)
-    return HEADER_LOOKUP.get(text, "")
+    return re.sub(r"[^a-z0-9_]", "", text)
+
+
+def build_lookup(columns):
+    lookup = {}
+    for canonical, aliases in columns.items():
+        for alias in aliases:
+            lookup[_header_key(alias)] = canonical
+    return lookup
+
+
+def _norm_header(value, lookup=None):
+    return (lookup or HEADER_LOOKUP).get(_header_key(value), "")
 
 
 def _clean(value):
@@ -94,21 +105,27 @@ def _clean_phone(value):
     return digits
 
 
-def read_rows(file_obj, filename=""):
-    """Yield dicts keyed by canonical column name. Handles .xlsx and .csv."""
+def read_rows(file_obj, filename="", lookup=None, required=None, sheet="Students"):
+    """
+    Yield (line, dict keyed by canonical column name). Handles .xlsx and .csv.
+
+    Students by default; the teacher import passes its own column aliases,
+    required columns and preferred sheet name.
+    """
     name = (filename or getattr(file_obj, "name", "")).lower()
+    required = REQUIRED if required is None else required
 
     if name.endswith((".xlsx", ".xlsm")):
         from openpyxl import load_workbook
         workbook = load_workbook(file_obj, read_only=True, data_only=True)
-        sheet = workbook["Students"] if "Students" in workbook.sheetnames else workbook.worksheets[0]
-        rows = sheet.iter_rows(values_only=True)
+        sheet_obj = workbook[sheet] if sheet in workbook.sheetnames else workbook.worksheets[0]
+        rows = sheet_obj.iter_rows(values_only=True)
         try:
             header = next(rows)
         except StopIteration:
             raise ImportError_("That spreadsheet is empty.")
-        mapping = [_norm_header(cell) for cell in header]
-        _check_header(mapping)
+        mapping = [_norm_header(cell, lookup) for cell in header]
+        _check_header(mapping, required)
         for index, raw in enumerate(rows, start=2):
             if raw is None or all(cell is None or str(cell).strip() == "" for cell in raw):
                 continue
@@ -125,8 +142,8 @@ def read_rows(file_obj, filename=""):
         header = next(reader)
     except StopIteration:
         raise ImportError_("That file is empty.")
-    mapping = [_norm_header(cell) for cell in header]
-    _check_header(mapping)
+    mapping = [_norm_header(cell, lookup) for cell in header]
+    _check_header(mapping, required)
     for index, raw in enumerate(reader, start=2):
         if not any(str(cell).strip() for cell in raw):
             continue
@@ -134,8 +151,8 @@ def read_rows(file_obj, filename=""):
                       if mapping[i]}
 
 
-def _check_header(mapping):
-    missing = [c for c in REQUIRED if c not in mapping]
+def _check_header(mapping, required=None):
+    missing = [c for c in (REQUIRED if required is None else required) if c not in mapping]
     if missing:
         raise ImportError_(
             "The file is missing these columns: " + ", ".join(missing)
@@ -273,8 +290,17 @@ def _guess_class_order(name):
 TRUE_WORDS = {"1", "true", "yes", "y", "active", "a"}
 
 
-def run_job(job: ImportJob, progress_every=CHUNK):
-    """Do the whole import. Safe to call from Celery or from a shell."""
+def run_job(job: ImportJob, progress_every=CHUNK, allow_logins=True):
+    """
+    Do the whole import. Safe to call from Celery or from a shell.
+
+    allow_logins=False is for imports run inside a web request. Hashing a
+    password takes about a third of a second on purpose; two thousand of them
+    would outlive any web request and leave the job half done.
+    """
+    if job.kind == "TEACHERS":
+        from .teacher_imports import run_teacher_job
+        return run_teacher_job(job, allow_logins=allow_logins)
     job.status = ImportStatus.RUNNING
     job.started_at = timezone.now()
     job.processed = job.created = job.updated = job.skipped = job.deactivated = 0
@@ -436,8 +462,14 @@ def run_job(job: ImportJob, progress_every=CHUNK):
         job.processed = min(job.total_rows, job.created + job.updated + job.skipped)
         job.save(update_fields=["updated", "processed"])
 
-    if job.create_logins:
-        _create_logins(to_create)
+    if job.create_logins and allow_logins:
+        from .logins import create_student_logins
+        create_student_logins(Student.objects.filter(
+            admission_no__in=[row["admission_no"] for row in parsed]))
+    elif job.create_logins:
+        problems.insert(0, "Logins were not created — that takes minutes and cannot run "
+                           "inside this page. On the server: "
+                           "python manage.py create_logins --students")
 
     if job.deactivate_missing and seen:
         touched_sections = {row["section"].pk for row in parsed}
@@ -451,42 +483,3 @@ def run_job(job: ImportJob, progress_every=CHUNK):
     job.finished_at = timezone.now()
     job.save()
     return job
-
-
-def _create_logins(students):
-    """One login per new student, in bulk. Existing usernames are left alone."""
-    from django.contrib.auth import get_user_model
-
-    from accounts.models import Role
-
-    User = get_user_model()
-    wanted = {s.admission_no: s for s in students if s.pk and not s.user_id}
-    if not wanted:
-        wanted = {s.admission_no: s for s in
-                  Student.objects.filter(admission_no__in=[x.admission_no for x in students],
-                                         user__isnull=True)}
-    if not wanted:
-        return
-
-    taken = set(User.objects.filter(username__in=list(wanted)).values_list("username", flat=True))
-    fresh = []
-    for admission, student in wanted.items():
-        if admission in taken:
-            continue
-        user = User(username=admission, role=Role.STUDENT,
-                    first_name=student.full_name[:30], must_change_password=True)
-        user.set_password(admission)
-        fresh.append(user)
-
-    for start in range(0, len(fresh), CHUNK):
-        User.objects.bulk_create(fresh[start:start + CHUNK], ignore_conflicts=True)
-
-    users = {u.username: u for u in User.objects.filter(username__in=list(wanted))}
-    linked = []
-    for admission, student in wanted.items():
-        user = users.get(admission)
-        if user and not student.user_id:
-            student.user = user
-            linked.append(student)
-    for start in range(0, len(linked), CHUNK):
-        Student.objects.bulk_update(linked[start:start + CHUNK], ["user"], batch_size=CHUNK)
