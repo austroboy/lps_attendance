@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Teacher access{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Teacher access</h1>
+<p>A teacher sees and edits only the classes listed here. Leave the section empty to grant the
+whole class.</p></div></div>
+
+<div class="grid c2">
+<div class="card">
+  <h2>Grant access</h2>
+  <form method="post">{% csrf_token %}{% include "_form.html" %}
+    <button class="btn" type="submit">Grant</button></form>
+</div>
+<div class="card">
+  <h2>Current grants</h2>
+  {% if grants %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Teacher</th><th>Scope</th><th>Can edit</th><th>Can SMS</th><th></th></tr></thead>
+    <tbody>{% for g in grants %}
+      <tr><td>{{ g.teacher.full_name }}</td>
+        <td>{{ g.section|default:g.school_class }}</td>
+        <td>{% if g.can_edit_attendance %}Yes{% else %}No{% endif %}</td>
+        <td>{% if g.can_send_sms %}Yes{% else %}No{% endif %}</td>
+        <td><a class="btn danger small" href="{% url 'academics:access_delete' g.pk %}">Remove</a></td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<div class="empty">No access granted yet.</div>{% endif %}
+</div>
+</div>
+{% endblock %}

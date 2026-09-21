@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Classes{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>School structure</h1>
+    <p>A section is what you drag onto a timetable, so every class needs at least one.
+      Importing a spreadsheet creates all of this for you — this page is for tidying up
+      afterwards.</p></div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% url 'academics:session_new' %}">Session</a>
+    <a class="btn ghost" href="{% url 'academics:shift_new' %}">Shift</a>
+    <a class="btn ghost" href="{% url 'academics:version_new' %}">Version</a>
+    <a class="btn ghost" href="{% url 'academics:group_new' %}">Group</a>
+    <a class="btn ghost" href="{% url 'academics:section_new' %}">Section</a>
+    <a class="btn" href="{% url 'academics:class_new' %}">Class</a>
+  </div>
+</div>
+
+<div class="grid c3">
+  <div class="card"><h3>Shifts</h3>
+    {% if shifts %}<ul class="plain">{% for s in shifts %}
+      <li><a href="{% url 'academics:shift_edit' s.pk %}">{{ s.name }}</a>
+        <span class="muted">{{ s.sections.count }} section{{ s.sections.count|pluralize }}</span></li>
+    {% endfor %}</ul>{% else %}<p class="muted">None yet. Optional.</p>{% endif %}</div>
+
+  <div class="card"><h3>Versions</h3>
+    {% if versions %}<ul class="plain">{% for v in versions %}
+      <li><a href="{% url 'academics:version_edit' v.pk %}">{{ v.name }}</a>
+        <span class="muted">{{ v.sections.count }} section{{ v.sections.count|pluralize }}</span></li>
+    {% endfor %}</ul>{% else %}<p class="muted">None yet. Optional.</p>{% endif %}</div>
+
+  <div class="card"><h3>Groups</h3>
+    {% if groups %}<ul class="plain">{% for g in groups %}
+      <li><a href="{% url 'academics:group_edit' g.pk %}">{{ g.name }}</a>
+        <span class="muted">{{ g.sections.count }} section{{ g.sections.count|pluralize }}</span></li>
+    {% endfor %}</ul>{% else %}<p class="muted">None yet. Usually class nine and up.</p>{% endif %}</div>
+</div>
+
+<div class="card">
+  <h2>Classes</h2>
+  {% if classes %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Class</th><th>Session</th><th class="num">Sections</th>
+      <th class="num">Students</th><th></th></tr></thead>
+    <tbody>{% for c in classes %}
+      <tr><td>{{ c.name }}</td><td>{{ c.session|default:"—" }}</td>
+        <td class="num">{{ c.section_count }}</td><td class="num">{{ c.student_count }}</td>
+        <td><a class="btn ghost small" href="{% url 'academics:class_edit' c.pk %}">Edit</a></td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<div class="empty">No classes yet.
+    <a href="{% url 'academics:student_import' %}">Import a spreadsheet</a> and they will be
+    created for you.</div>{% endif %}
+</div>
+
+<div class="card">
+  <h2>Sections</h2>
+  {% if sections %}
+  <div class="table-wrap"><table class="sticky-head">
+    <thead><tr><th>Class</th><th>Section</th><th>Shift</th><th>Version</th><th>Group</th>
+      <th>Room</th><th class="num">Students</th><th></th></tr></thead>
+    <tbody>{% for s in sections %}
+      <tr><td>{{ s.school_class.name }}</td><td>{{ s.name }}</td>
+        <td class="muted">{{ s.shift.name|default:"—" }}</td>
+        <td class="muted">{{ s.version.name|default:"—" }}</td>
+        <td class="muted">{{ s.group.name|default:"—" }}</td>
+        <td class="muted">{{ s.room|default:"—" }}</td>
+        <td class="num">{{ s.students.count }}</td>
+        <td><a class="btn ghost small" href="{% url 'academics:section_edit' s.pk %}">Edit</a></td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}<div class="empty">No sections yet.</div>{% endif %}
+</div>
+{% endblock %}

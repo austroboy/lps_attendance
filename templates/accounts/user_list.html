@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Users</h1><p>{{ total }} account{{ total|pluralize }}.</p></div>
+  {% if nav_is_superadmin %}<a class="btn" href="{% url 'accounts:user_new' %}">Add user</a>{% endif %}
+</div>
+<form class="filters" method="get">
+  <div class="form-row"><label>Search</label>
+    <input type="text" name="q" value="{{ search }}" placeholder="Name or username"></div>
+  <div class="form-row"><label>Role</label><select name="role">
+    <option value="">Every role</option>
+    {% for value, label in roles %}
+      <option value="{{ value }}" {% if role == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}</select></div>
+  <button class="btn ghost" type="submit">Filter</button>
+</form>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Phone</th><th>Active</th><th></th></tr></thead>
+  <tbody>
+  {% for u in page %}
+    <tr><td class="mono">{{ u.username }}</td><td>{{ u.get_full_name|default:"—" }}</td>
+      <td>{{ u.get_role_display }}</td><td>{{ u.phone|default:"—" }}</td>
+      <td>{% if u.is_active %}<span class="badge ok">Yes</span>{% else %}<span class="badge bad">No</span>{% endif %}</td>
+      <td>{% if nav_is_superadmin %}<a class="btn ghost small" href="{% url 'accounts:user_edit' u.pk %}">Edit</a>{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="6" class="empty">No users match that filter.</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% include "_pager.html" %}
+</div>
+{% endblock %}

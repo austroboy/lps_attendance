@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Monthly sheet{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Monthly sheet · {{ month_name }} {{ year }}</h1>
+  <p>One row per student. A day shows the worst outcome recorded that day, so a late morning
+  still reads as late even if the afternoon slot was fine.</p></div>
+  <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
+</div>
+
+<form class="filters" method="get">
+  <div class="form-row"><label>Class</label><select name="section">
+    {% for s in sections %}<option value="{{ s.pk }}" {% if section_id == s.pk|stringformat:"s" %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select></div>
+  <div class="form-row"><label>Month</label><select name="month">
+    {% for value, label in months %}<option value="{{ value }}" {% if month == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="form-row"><label>Year</label><select name="year">
+    {% for y in years %}<option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>{% endfor %}
+  </select></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+
+<div class="card">
+{% if page %}
+<div class="table-wrap"><table class="month">
+  <thead><tr><th class="name">Roll</th><th class="name">Name</th>
+    {% for d in days %}<th>{{ d }}</th>{% endfor %}
+    <th class="num">P</th><th class="num">A</th><th class="num">L</th><th class="num">Rate</th></tr></thead>
+  <tbody>{% for row in page %}
+    <tr><td class="name">{{ row.student.roll_no|default:"—" }}</td>
+      <td class="name">{{ row.student.full_name }}</td>
+      {% for cell in row.cells %}
+        <td>{% if cell %}<span class="cell {{ cell }}" title="{{ cell }}">{{ cell|slice:":1" }}</span>{% endif %}</td>
+      {% endfor %}
+      <td class="num">{{ row.present }}</td><td class="num">{{ row.absent }}</td>
+      <td class="num">{{ row.late }}</td><td class="num">{{ row.rate }}%</td></tr>
+  {% endfor %}</tbody></table></div>
+{% include "_pager.html" %}
+<p class="muted" style="margin-top:10px;">P present · L late · A absent · L(eave) and H(oliday)
+shown in grey. Every export covers the whole class, not just this page.</p>
+{% else %}
+<div class="empty">No students in this class, or nothing recorded this month.</div>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Import students{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div><h1>Import students</h1>
+    <p>Built for a full roll at once. Students are matched on admission number, so
+      re-uploading a corrected file fixes rows rather than duplicating them.</p></div>
+  <a class="btn" href="{% url 'academics:import_sample' %}">Download sample Excel</a>
+</div>
+
+<div class="grid c2">
+  <div class="card">
+    <h2>Upload a file</h2>
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}
+      {% include "_form.html" %}
+      <button class="btn" type="submit">Start import</button>
+    </form>
+    <p class="muted" style="margin-top:10px;">
+      Large files run in the background — you can leave the page and come back.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>How it works</h2>
+    <p>The sample workbook already knows your school: the class, shift, version and
+      group columns come with dropdowns of what exists today, and the identifier and
+      phone columns are locked to text so 01712345678 keeps its leading zero.</p>
+    <p>Anything you type that does not exist yet is created — a new class, a new shift,
+      a new section, a new group. You do not need to set up the structure first. After
+      the import you get a list of exactly what was created, so a typo like
+      “Clas Six” is obvious before it spreads through the roll.</p>
+    <p class="muted">Right now: {{ classes }} class{{ classes|pluralize:"es" }},
+      {{ sections }} section{{ sections|pluralize }}, {{ students }} active student{{ students|pluralize }}.</p>
+    <h3 style="margin-top:14px;">Before a big upload</h3>
+    <p class="muted">Tick <strong>Check the file first</strong>. It reads every row, reports
+      every problem and lists everything it would create, without writing anything. Then
+      untick it and upload the same file again.</p>
+  </div>
+</div>
+
+{% if jobs %}
+<div class="card">
+  <h2>Recent imports</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>File</th><th>When</th><th>Status</th><th class="num">Rows</th>
+      <th class="num">Added</th><th class="num">Updated</th><th class="num">Skipped</th><th></th></tr></thead>
+    <tbody>{% for job in jobs %}
+      <tr>
+        <td>{{ job.original_name|default:"—" }}{% if job.dry_run %}
+          <span class="badge LEAVE">check only</span>{% endif %}</td>
+        <td class="muted">{{ job.created_at|date:"j M, H:i" }}</td>
+        <td><span class="badge {% if job.status == 'DONE' %}ok{% elif job.status == 'FAILED' %}bad{% else %}LATE{% endif %}">{{ job.get_status_display }}</span></td>
+        <td class="num">{{ job.total_rows }}</td><td class="num">{{ job.created }}</td>
+        <td class="num">{{ job.updated }}</td><td class="num">{{ job.skipped }}</td>
+        <td><a class="btn ghost small" href="{% url 'academics:import_progress' job.pk %}">Open</a></td>
+      </tr>
+    {% endfor %}</tbody></table></div>
+</div>
+{% endif %}
+
+{% endblock %}

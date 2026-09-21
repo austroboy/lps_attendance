@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Students{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div><h1>Students</h1>
+    <p>{{ total }} match{{ total|pluralize:"es" }} this filter.</p></div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
+    {% if nav_is_admin %}<a class="btn ghost" href="{% url 'academics:student_import' %}">Import</a>{% endif %}
+    <a class="btn" href="{% url 'academics:student_new' %}">Add student</a>
+  </div>
+</div>
+
+<div id="roster-status" class="notice" hidden></div>
+
+{% if not devices %}
+  <div class="notice warning">
+    No active terminal is registered, so a face cannot be enrolled yet.
+    {% if nav_is_admin %}<a href="{% url 'devices:list' %}">Add a device</a> first.{% endif %}
+  </div>
+{% endif %}
+
+<div class="grid c4" style="margin-bottom:16px;">
+  <div class="stat"><div class="n">{{ summary.done }}</div><div class="k">Face enrolled</div></div>
+  <div class="stat {% if summary.pending %}warn{% endif %}"><div class="n">{{ summary.pending }}</div>
+    <div class="k">Waiting at a terminal</div></div>
+  <div class="stat"><div class="n">{{ summary.none }}</div><div class="k">No face yet</div></div>
+  <div class="stat"><div class="n">{{ summary.carded }}</div><div class="k">Card issued</div></div>
+</div>
+
+<form class="filters" method="get">
+  <div class="form-row" style="min-width:190px;"><label>Search</label>
+    <input type="text" name="q" value="{{ search }}" placeholder="Name, roll, phone, card"></div>
+  <div class="form-row"><label>Class</label><select name="school_class">
+    <option value="">All</option>
+    {% for c in classes %}<option value="{{ c.pk }}" {% if class_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select></div>
+  {% if shifts %}<div class="form-row"><label>Shift</label><select name="shift">
+    <option value="">All</option>
+    {% for s in shifts %}<option value="{{ s.pk }}" {% if shift_id == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+  </select></div>{% endif %}
+  {% if versions %}<div class="form-row"><label>Version</label><select name="version">
+    <option value="">All</option>
+    {% for v in versions %}<option value="{{ v.pk }}" {% if version_id == v.pk|stringformat:"s" %}selected{% endif %}>{{ v.name }}</option>{% endfor %}
+  </select></div>{% endif %}
+  {% if groups %}<div class="form-row"><label>Group</label><select name="group">
+    <option value="">All</option>
+    {% for g in groups %}<option value="{{ g.pk }}" {% if group_id == g.pk|stringformat:"s" %}selected{% endif %}>{{ g.name }}</option>{% endfor %}
+  </select></div>{% endif %}
+  <div class="form-row" style="min-width:170px;"><label>Section</label><select name="section">
+    <option value="">All</option>
+    {% for s in sections %}<option value="{{ s.pk }}" {% if section_id == s.pk|stringformat:"s" %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select></div>
+  <div class="form-row"><label>Face</label><select name="face">
+    <option value="">Any</option>
+    <option value="todo" {% if face == "todo" %}selected{% endif %}>Still to do</option>
+    <option value="waiting" {% if face == "waiting" %}selected{% endif %}>Waiting now</option>
+    <option value="done" {% if face == "done" %}selected{% endif %}>Enrolled</option>
+  </select></div>
+  <div class="form-row checks">
+    <label class="check"><input type="checkbox" name="unmapped" value="1" {% if unmapped %}checked{% endif %}> No device id</label>
+    <label class="check"><input type="checkbox" name="inactive" value="1" {% if inactive %}checked{% endif %}> Off the roll</label>
+  </div>
+  <button class="btn ghost" type="submit">Filter</button>
+  <a class="btn ghost" href="{% url 'academics:student_list' %}">Clear</a>
+</form>
+
+<div class="card">
+{% if page %}
+<div class="table-wrap"><table class="sticky-head roster"
+     data-roster
+     data-states-url="{% url 'academics:student_states' %}"
+     data-csrf="{{ csrf_token }}">
+  <thead><tr>
+    <th class="num">Roll</th><th>Name</th><th>Class</th>
+    <th>Device id</th><th>RFID</th><th>Face</th><th>On roll</th><th></th>
+  </tr></thead>
+  <tbody>{% for s in page %}
+    <tr data-student="{{ s.pk }}"
+        data-name="{{ s.full_name }}"
+        data-rfid-url="{% url 'academics:student_set_rfid' s.pk %}"
+        data-face-url="{% url 'academics:student_face' s.pk %}"
+        data-active-url="{% url 'academics:student_set_active' s.pk %}"
+        class="{% if not s.is_active %}is-off{% endif %}">
+      <td class="num">{{ s.roll_no|default:"—" }}</td>
+      <td>
+        <a href="{% url 'academics:student_edit' s.pk %}">{{ s.full_name }}</a>
+        <div class="muted mono">{{ s.admission_no }}</div>
+      </td>
+      <td>{{ s.section.school_class.name }} · {{ s.section.name }}
+        {% if s.section.shift %}<div class="muted">{{ s.section.shift.name }}{% if s.section.version %} · {{ s.section.version.name }}{% endif %}</div>{% endif %}
+      </td>
+      <td class="mono" data-cell="device">{{ s.device_user_id|default:"—" }}</td>
+
+      <td>
+        <input type="text" class="rfid-input" data-cell="rfid"
+               value="{{ s.rfid_number }}" placeholder="scan or type"
+               inputmode="latin" autocomplete="off" spellcheck="false"
+               aria-label="Card number for {{ s.full_name }}">
+      </td>
+
+      <td data-cell="face">{% include "academics/_face_cell.html" with s=s %}</td>
+
+      <td data-cell="active">
+        {% if s.is_active %}
+          <span class="badge ok">On roll</span>
+        {% else %}
+          <span class="badge bad">{{ s.get_leave_reason_display|default:"Off roll" }}</span>
+          {% if s.left_on %}<div class="muted">{{ s.left_on|date:"j M Y" }}</div>{% endif %}
+        {% endif %}
+      </td>
+
+      <td class="row-actions">
+        {% if s.is_active %}
+          <button type="button" class="btn ghost small js-deactivate">Remove</button>
+        {% else %}
+          <button type="button" class="btn ghost small js-reactivate">Restore</button>
+        {% endif %}
+      </td>
+    </tr>
+  {% endfor %}</tbody>
+</table></div>
+{% include "_pager.html" %}
+{% else %}
+<div class="empty">
+  <p>No students match this filter.</p>
+  <p class="muted">Clear the filters, or
+    <a href="{% url 'academics:student_import' %}">import a spreadsheet</a>.</p>
+</div>
+{% endif %}
+</div>
+
+<div class="card">
+  <h3>Enrolling faces</h3>
+  <p class="muted">Press the ✗ in the Face column. That student turns amber and is pushed to
+    every terminal with their device id showing. Send them to a machine and enrol the face
+    against that id — the moment the terminal reports back, the row ticks by itself. You can
+    leave this page open on a phone while you work through a class.</p>
+  <p class="muted">A student with no device id gets one automatically when you press ✗, so
+    there is nothing to set up first. Card numbers save as you type — scan straight into the
+    RFID box and it is stored.</p>
+</div>
+
+<!-- Removal dialog -->
+<div class="modal" id="leave-modal" hidden>
+  <div class="modal-card">
+    <h3>Take <span id="leave-name">this student</span> off the roll</h3>
+    <p class="muted">Their attendance history is kept, so past reports stay correct. They stop
+      appearing on registers and stop receiving SMS.</p>
+    <div class="form-row"><label>Reason</label>
+      <select id="leave-reason">
+        {% for value, label in leave_reasons %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select></div>
+    <div class="form-row"><label>Note (optional)</label>
+      <input type="text" id="leave-note" maxlength="200"></div>
+    <div class="form-row checks">
+      <label class="check"><input type="checkbox" id="leave-keep"> Leave them on the terminals</label>
+    </div>
+    <p class="muted">Unticked, they are deleted from every terminal so a student who has left
+      cannot mark themselves present.</p>
+    <div class="btn-row">
+      <button type="button" class="btn danger" id="leave-confirm">Take off the roll</button>
+      <button type="button" class="btn ghost" id="leave-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/roster.js' %}"></script>{% endblock %}

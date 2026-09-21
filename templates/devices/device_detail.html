@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}{{ device.name }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ device.name }}</h1>
+    <p class="mono">{{ device.serial_number }}</p>
+    <p><span class="dot {% if device.is_online %}on{% else %}off{% endif %}"></span>{{ device.status_label }}
+      {% if device.last_seen %}· last heard {{ device.last_seen|timesince }} ago{% endif %}</p></div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% url 'devices:sync_time' device.pk %}">Sync clock</a>
+    <a class="btn ghost" href="{% url 'devices:pull_logs' device.pk %}">Backfill punch log</a>
+    <a class="btn ghost" href="{% url 'devices:edit' device.pk %}">Edit</a>
+  </div>
+</div>
+
+<div class="grid c2">
+  <div class="card">
+    <h2>Send a command</h2>
+    <p class="muted">Commands sit in a queue. The terminal collects them on its next poll, so a
+      device that is offline will run them when it comes back.</p>
+    <form method="post">{% csrf_token %}{% include "_form.html" %}
+      <button class="btn" type="submit">Queue command</button></form>
+    <details style="margin-top:12px;"><summary class="muted">Parameter examples</summary>
+      <table style="margin-top:8px;"><tbody>
+      {% for code, hint in hints.items %}
+        <tr><td class="mono">{{ code }}</td><td class="mono">{{ hint }}</td></tr>
+      {% endfor %}</tbody></table></details>
+  </div>
+
+  <div class="card">
+    <h2>Command history</h2>
+    {% if commands %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>#</th><th>Command</th><th>Status</th><th>Return</th><th>When</th><th></th></tr></thead>
+      <tbody>{% for c in commands %}
+        <tr><td class="mono">{{ c.pk }}</td><td class="mono">{{ c.cmd_code }}</td>
+          <td>{{ c.get_status_display }}</td><td class="mono">{{ c.return_code|default:"—" }}</td>
+          <td class="muted">{{ c.created_at|date:"j M H:i" }}</td>
+          <td>{% if c.status == "WAIT" %}<a class="btn danger small" href="{% url 'devices:command_cancel' c.pk %}">Cancel</a>{% endif %}</td></tr>
+        {% if c.result_json %}<tr><td></td><td colspan="5"><details><summary class="muted">Result</summary>
+          <pre>{{ c.result_json }}</pre></details></td></tr>{% endif %}
+      {% endfor %}</tbody></table></div>
+    {% else %}<div class="empty">No commands sent yet.</div>{% endif %}
+  </div>
+</div>
+
+<div class="grid c2">
+  <div class="card">
+    <h2>Recent punches</h2>
+    {% if punches %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Time</th><th>User id</th><th>Verify</th><th>Result</th></tr></thead>
+      <tbody>{% for p in punches %}
+        <tr><td>{{ p.punch_time|date:"j M H:i:s" }}</td><td class="mono">{{ p.device_user_id }}</td>
+          <td>{{ p.verify_mode|default:"—" }}</td><td class="muted">{{ p.process_note|default:"—" }}</td></tr>
+      {% endfor %}</tbody></table></div>
+    {% else %}<div class="empty">This terminal has not sent a punch yet.</div>{% endif %}
+  </div>
+  <div class="card">
+    <h2>Users on this terminal</h2>
+    {% if enrollments %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>User id</th><th>Name on device</th><th>Privilege</th></tr></thead>
+      <tbody>{% for e in enrollments %}
+        <tr><td class="mono">{{ e.device_user_id }}</td><td>{{ e.user_name|default:"—" }}</td>
+          <td>{{ e.privilege|default:"—" }}</td></tr>
+      {% endfor %}</tbody></table></div>
+    <p class="muted" style="margin-top:10px;">
+      <a href="{% url 'devices:enrollments' %}?device={{ device.pk }}">Link these to students</a></p>
+    {% else %}
+      <div class="empty">Nothing known yet. Queue <span class="mono">GET_USER_ID_LIST</span> to
+      ask the terminal who it has enrolled.</div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

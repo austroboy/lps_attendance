@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Teacher register{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Teacher register · {{ day|date:"j F Y" }}</h1></div></div>
+<form class="filters" method="get">
+  <div class="form-row"><label>Date</label><input type="date" name="date" value="{{ day|date:'Y-m-d' }}"></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+<div class="grid c4" style="margin-bottom:16px;">
+  <div class="stat"><div class="n">{{ summary.PRESENT|default:0 }}</div><div class="k">Present</div></div>
+  <div class="stat"><div class="n">{{ summary.LATE|default:0 }}</div><div class="k">Late</div></div>
+  <div class="stat"><div class="n">{{ summary.ABSENT|default:0 }}</div><div class="k">Absent</div></div>
+  <div class="stat"><div class="n">{{ summary.LEAVE|default:0 }}</div><div class="k">On leave</div></div>
+</div>
+<div class="card">{% if page %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Code</th><th>Name</th><th>Slot</th><th>Status</th><th>In</th><th>Out</th>
+  {% if nav_is_admin %}<th>Change</th>{% endif %}</tr></thead>
+  <tbody>{% for r in page %}
+    <tr><td class="mono">{{ r.teacher.employee_code }}</td><td>{{ r.teacher.full_name }}</td>
+      <td>{{ r.time_slot.name }}</td>
+      <td><span class="badge {{ r.status }}">{{ r.get_status_display }}</span></td>
+      <td>{{ r.in_time|date:"H:i"|default:"—" }}</td><td>{{ r.out_time|date:"H:i"|default:"—" }}</td>
+      {% if nav_is_admin %}<td><form method="post" action="{% url 'attendance:teacher_record_update' r.pk %}" class="btn-row">
+        {% csrf_token %}<select name="status" style="width:auto;">
+        {% for value, label in statuses %}<option value="{{ value }}" {% if r.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select><button class="btn small" type="submit">Set</button></form></td>{% endif %}</tr>
+  {% endfor %}</tbody></table></div>
+{% include "_pager.html" %}
+{% else %}<div class="empty">No teacher records for this day.</div>{% endif %}</div>
+{% endblock %}

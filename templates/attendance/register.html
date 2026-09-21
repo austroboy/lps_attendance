@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Daily register{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Register · {{ day|date:"j F Y" }}</h1>
+  <p>{{ total }} record{{ total|pluralize }} match this filter. Records are created by the terminals. Change one by hand and it is locked against
+  overwriting — the engine will leave it alone afterwards.</p></div>
+  <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
+</div>
+
+<form class="filters" method="get">
+  <div class="form-row"><label>Date</label><input type="date" name="date" value="{{ day|date:'Y-m-d' }}"></div>
+  <div class="form-row"><label>Class</label><select name="section">
+    <option value="">Every class</option>
+    {% for s in sections %}<option value="{{ s.pk }}" {% if section_id == s.pk|stringformat:"s" %}selected{% endif %}>{{ s }}</option>{% endfor %}
+  </select></div>
+  <div class="form-row"><label>Slot</label><select name="slot">
+    <option value="">Every slot</option>
+    {% for s in slots %}<option value="{{ s.pk }}" {% if slot_id == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.name }}</option>{% endfor %}
+  </select></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+
+<div class="grid c4" style="margin-bottom:16px;">
+  <div class="stat"><div class="n">{{ summary.PRESENT|default:0 }}</div><div class="k">Present</div></div>
+  <div class="stat"><div class="n">{{ summary.LATE|default:0 }}</div><div class="k">Late</div></div>
+  <div class="stat"><div class="n">{{ summary.ABSENT|default:0 }}</div><div class="k">Absent</div></div>
+  <div class="stat"><div class="n">{{ summary.LEAVE|default:0 }}</div><div class="k">On leave</div></div>
+</div>
+
+<div class="card">
+{% if page %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Roll</th><th>Name</th><th>Class</th><th>Slot</th><th>Status</th>
+    <th>In</th><th>Out</th><th class="num">Late</th><th>Change</th></tr></thead>
+  <tbody>{% for r in page %}
+    <tr><td>{{ r.student.roll_no|default:"—" }}</td><td>{{ r.student.full_name }}</td>
+      <td>{{ r.student.section }}</td><td>{{ r.time_slot.name }}</td>
+      <td><span class="badge {{ r.status }}">{{ r.get_status_display }}</span>
+        {% if r.is_manual %}<span class="muted"> by hand</span>{% endif %}</td>
+      <td>{{ r.in_time|date:"H:i"|default:"—" }}</td>
+      <td>{{ r.out_time|date:"H:i"|default:"—" }}</td>
+      <td class="num">{% if r.minutes_late %}{{ r.minutes_late }}m{% else %}—{% endif %}</td>
+      <td><form method="post" action="{% url 'attendance:record_update' r.pk %}" class="btn-row">
+        {% csrf_token %}<select name="status" style="width:auto;">
+        {% for value, label in statuses %}<option value="{{ value }}" {% if r.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select><button class="btn small" type="submit">Set</button></form></td></tr>
+  {% endfor %}</tbody></table></div>
+{% include "_pager.html" %}
+{% else %}
+<div class="empty">
+  <p>Nothing recorded for this day and filter.</p>
+  <p class="muted">If the terminals were running, check that the class is in a time slot and that
+  its students have a device user id set.</p>
+</div>
+{% endif %}
+</div>
+{% endblock %}

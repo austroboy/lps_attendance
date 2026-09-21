@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Device activity{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Device activity</h1>
+<p>Punches per terminal, {{ start|date:"j M" }} to {{ end|date:"j M Y" }}. A terminal that
+suddenly stops reporting is usually a network or power problem, not a broken device.</p></div></div>
+
+<form class="filters" method="get">
+  <div class="form-row"><label>From</label><input type="date" name="from" value="{{ start|date:'Y-m-d' }}"></div>
+  <div class="form-row"><label>To</label><input type="date" name="to" value="{{ end|date:'Y-m-d' }}"></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+
+{% if silent %}
+<div class="notice warning">
+  Not currently reachable:
+  {% for d in silent %}<span class="mono">{{ d.name }}</span>{% if not forloop.last %}, {% endif %}{% endfor %}.
+</div>
+{% endif %}
+
+<div class="card">
+{% if rows %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Terminal</th><th>Serial</th><th class="num">Punches</th>
+    <th class="num">Unmatched</th></tr></thead>
+  <tbody>{% for r in rows %}
+    <tr><td>{{ r.device__name }}</td><td class="mono">{{ r.device__serial_number }}</td>
+      <td class="num">{{ r.n }}</td>
+      <td class="num">{% if r.unmatched %}<span class="badge bad">{{ r.unmatched }}</span>{% else %}0{% endif %}</td></tr>
+  {% endfor %}</tbody></table></div>
+<p class="muted" style="margin-top:10px;">Unmatched means the device user id on that punch is not
+attached to anyone. <a href="{% url 'devices:enrollments' %}">Fix those links</a>.</p>
+{% else %}
+<div class="empty">No punches in this range.</div>
+{% endif %}
+</div>
+{% endblock %}

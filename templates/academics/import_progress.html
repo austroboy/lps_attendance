@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Import {{ job.pk }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div><h1>{{ job.original_name|default:"Import" }}</h1>
+    <p>Started {{ job.created_at|date:"j F Y, H:i" }}{% if job.created_by %}
+      by {{ job.created_by.get_full_name|default:job.created_by.username }}{% endif %}.
+      {% if job.dry_run %}This is a check only — nothing will be saved.{% endif %}</p></div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% url 'academics:student_import' %}">New import</a>
+    <a class="btn ghost" href="{% url 'academics:student_list' %}">Students</a>
+  </div>
+</div>
+
+<div class="card" id="panel"
+     data-status-url="{% url 'academics:import_status' job.pk %}"
+     data-running="{{ job.is_running|yesno:'1,0' }}">
+
+  <div class="progress-head">
+    <strong id="status-label">{{ job.get_status_display }}</strong>
+    <span class="muted" id="status-count">
+      {{ job.processed }} of {{ job.total_rows }} row{{ job.total_rows|pluralize }}</span>
+  </div>
+  <div class="progress"><div class="bar" id="bar" style="width: {{ job.percent }}%"></div></div>
+
+  <div class="grid c4" style="margin-top:14px;">
+    <div class="stat"><div class="n" id="n-created">{{ job.created }}</div><div class="k">Added</div></div>
+    <div class="stat"><div class="n" id="n-updated">{{ job.updated }}</div><div class="k">Updated</div></div>
+    <div class="stat"><div class="n" id="n-skipped">{{ job.skipped }}</div><div class="k">Skipped</div></div>
+    <div class="stat"><div class="n" id="n-deactivated">{{ job.deactivated }}</div><div class="k">Deactivated</div></div>
+  </div>
+
+  <div id="error-box" class="notice error" {% if not job.error %}hidden{% endif %}
+       style="margin-top:14px;">{{ job.error }}</div>
+
+  {% if job.status == "PENDING" %}
+    <div class="notice warning" style="margin-top:14px;">
+      Waiting for a background worker. Nothing has been imported yet.
+      <div class="btn-row" style="margin-top:8px;">
+        <a class="btn" href="{% url 'academics:import_run_now' job.pk %}">Run it now</a>
+        <a class="btn ghost" href="{% url 'academics:import_retry' job.pk %}">Queue again</a>
+      </div>
+      <p class="muted" style="margin:8px 0 0;">
+        <strong>Run it now</strong> imports the file in this window — the page will sit
+        there until it finishes, usually a second or two.
+        <strong>Queue again</strong> hands it back to Celery, which only helps once the
+        worker is actually running. From the server:
+        <code>python manage.py run_import {{ job.pk }}</code>.
+      </p>
+    </div>
+  {% elif job.status == "FAILED" %}
+    <div class="btn-row" style="margin-top:14px;">
+      <a class="btn" href="{% url 'academics:import_run_now' job.pk %}">Try again now</a>
+      <a class="btn ghost" href="{% url 'academics:import_retry' job.pk %}">Queue again</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card" id="created-card" {% if not job.created_anything %}hidden{% endif %}>
+  <h2>Created from this file</h2>
+  <p class="muted">These did not exist before. Check the spelling — a typo here becomes a
+    class nobody is in.</p>
+  <dl class="kv" id="created-list">
+    {% if job.new_classes %}<dt>Classes</dt><dd>{{ job.new_classes|join:", " }}</dd>{% endif %}
+    {% if job.new_shifts %}<dt>Shifts</dt><dd>{{ job.new_shifts|join:", " }}</dd>{% endif %}
+    {% if job.new_versions %}<dt>Versions</dt><dd>{{ job.new_versions|join:", " }}</dd>{% endif %}
+    {% if job.new_groups %}<dt>Groups</dt><dd>{{ job.new_groups|join:", " }}</dd>{% endif %}
+    {% if job.new_sections %}<dt>Sections</dt><dd>{{ job.new_sections|join:", " }}</dd>{% endif %}
+  </dl>
+</div>
+
+<div class="card" id="problem-card" {% if not job.problems %}hidden{% endif %}>
+  <h2>Rows that were skipped</h2>
+  <p class="muted">Everything else was imported. Fix these rows and upload the file again —
+    the students that did go in will be updated, not duplicated.</p>
+  <ul id="problem-list" class="problem-list">
+    {% for problem in job.problems %}<li>{{ problem }}</li>{% endfor %}
+  </ul>
+</div>
+
+{% if job.status == "DONE" and not job.dry_run %}
+<div class="card">
+  <h3>What next</h3>
+  <p class="muted">Students are in, but they will not produce attendance until two things are
+    true: their class is on a <a href="{% url 'attendance:board' %}">timetable</a>, and each
+    student has a device user id. Fill those in from
+    <a href="{% url 'devices:enrollments' %}">Device users</a> once the terminals are enrolled,
+    or filter the roll by
+    <a href="{% url 'academics:student_list' %}?unmapped=1">missing device id</a>.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const panel = document.getElementById("panel");
+  if (panel.dataset.running !== "1") return;
+
+  const url = panel.dataset.statusUrl;
+  const set = (id, value) => { const n = document.getElementById(id); if (n) n.textContent = value; };
+  let misses = 0;
+
+  const tick = () => {
+    fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } })
+      .then((r) => r.json())
+      .then((d) => {
+        misses = 0;
+        document.getElementById("bar").style.width = d.percent + "%";
+        set("status-label", d.status_label);
+        set("status-count", d.processed + " of " + d.total + " row" + (d.total === 1 ? "" : "s"));
+        set("n-created", d.created);
+        set("n-updated", d.updated);
+        set("n-skipped", d.skipped);
+        set("n-deactivated", d.deactivated);
+
+        if (d.error) {
+          const box = document.getElementById("error-box");
+          box.textContent = d.error;
+          box.hidden = false;
+        }
+        if (!d.running) {
+          // Reload once at the end so the created lists, the skipped rows and the
+          // next-steps card all render from the template rather than being rebuilt here.
+          window.location.reload();
+          return;
+        }
+        setTimeout(tick, 1500);
+      })
+      .catch(() => {
+        misses += 1;
+        if (misses < 10) setTimeout(tick, 3000);
+        else set("status-label", "Lost contact with the server — reload the page");
+      });
+  };
+  setTimeout(tick, 1200);
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ title }}</h1>
+<p>Three times define the window. Punches count from the opening time; on or after the late
+cut-off they are marked late; once the closing time passes, anyone with no punch is absent.</p></div></div>
+<div class="grid c2">
+<div class="card"><form method="post">{% csrf_token %}{% include "_form.html" %}
+  <div class="btn-row"><button class="btn" type="submit">Save slot</button>
+  <a class="btn ghost" href="{% url 'attendance:board' %}?type={{ form.instance.slot_type|default:'STUDENT' }}">Cancel</a></div></form></div>
+<div class="card"><h3>An example</h3>
+<dl class="kv">
+  <dt>Name</dt><dd>Morning entry</dd>
+  <dt>Opens</dt><dd>07:00 — the gate is open, punches start counting</dd>
+  <dt>Late after</dt><dd>08:00 — arrive at 08:01 and it is late</dd>
+  <dt>Closes</dt><dd>09:30 — no punch by now means absent</dd>
+  <dt>Check-out</dt><dd>13:30 to 15:00, optional, records a leaving time</dd>
+</dl>
+<p class="muted" style="margin-top:12px;">Windows of different slots should not overlap for the
+same class, or a single punch could sensibly belong to either one. The engine picks the
+earliest-opening match.</p></div>
+</div>
+{% endblock %}

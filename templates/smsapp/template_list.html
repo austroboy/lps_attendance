@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}SMS templates{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Message templates</h1>
+<p>Write once, reuse across schedules. Placeholders are filled per student when the message
+goes out.</p></div>
+<a class="btn" href="{% url 'smsapp:template_new' %}">New template</a></div>
+<div class="card">{% if templates %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Name</th><th>Message</th><th>Active</th><th></th></tr></thead>
+  <tbody>{% for t in templates %}
+    <tr><td>{{ t.name }}</td><td class="muted">{{ t.body }}</td>
+      <td>{% if t.is_active %}Yes{% else %}No{% endif %}</td>
+      <td><a class="btn ghost small" href="{% url 'smsapp:template_edit' t.pk %}">Edit</a></td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<div class="empty">No templates yet.</div>{% endif %}</div>
+{% endblock %}

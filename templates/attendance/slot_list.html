@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Time slots{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Time slots</h1><p>The windows attendance is measured against.</p></div>
+  <div class="btn-row"><a class="btn ghost" href="{% url 'attendance:board' %}?type={{ slot_type }}">Open the board</a>
+  <a class="btn" href="{% url 'attendance:slot_new' %}?type={{ slot_type }}">New slot</a></div>
+</div>
+<div class="card">{% if slots %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Name</th><th>Opens</th><th>Late after</th><th>Closes</th><th>Days</th>
+    <th class="num">Groups</th><th></th></tr></thead>
+  <tbody>{% for s in slots %}
+    <tr><td>{{ s.name }}</td><td>{{ s.start_time|time:"H:i" }}</td>
+      <td>{{ s.late_time|time:"H:i" }}</td><td>{{ s.end_time|time:"H:i" }}</td>
+      <td class="muted">{{ s.days_label }}</td>
+      <td class="num">{% if is_teacher_board %}{{ s.n_teachers }}{% else %}{{ s.n_sections }}{% endif %}</td>
+      <td><a class="btn ghost small" href="{% url 'attendance:slot_edit' s.pk %}">Edit</a></td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<div class="empty">No slots yet.</div>{% endif %}</div>
+{% endblock %}

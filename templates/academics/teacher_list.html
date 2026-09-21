@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Teachers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Teachers</h1><p>{{ total }} on record.</p></div>
+  <a class="btn" href="{% url 'academics:teacher_new' %}">Add teacher</a>
+</div>
+<form class="filters" method="get">
+  <div class="form-row"><label>Search</label><input type="text" name="q" value="{{ search }}"></div>
+  <button class="btn ghost" type="submit">Filter</button>
+</form>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Code</th><th>Name</th><th>Designation</th><th>Phone</th>
+    <th>Device user id</th><th>Login</th><th></th></tr></thead>
+  <tbody>{% for t in page %}
+    <tr><td class="mono">{{ t.employee_code }}</td><td>{{ t.full_name }}</td>
+      <td>{{ t.designation|default:"—" }}</td><td class="mono">{{ t.phone|default:"—" }}</td>
+      <td class="mono">{% if t.device_user_id %}{{ t.device_user_id }}{% else %}<span class="badge bad">not set</span>{% endif %}</td>
+      <td>{% if t.user %}{{ t.user.username }}{% else %}—{% endif %}</td>
+      <td><a class="btn ghost small" href="{% url 'academics:teacher_edit' t.pk %}">Edit</a></td></tr>
+  {% empty %}<tr><td colspan="7" class="empty">No teachers yet.</td></tr>{% endfor %}
+  </tbody></table></div>{% include "_pager.html" %}</div>
+{% endblock %}

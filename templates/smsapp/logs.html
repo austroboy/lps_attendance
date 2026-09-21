@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}SMS log{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>SMS log</h1><p>{{ total }} message{{ total|pluralize }} match this filter.</p></div>
+  <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
+</div>
+<form class="filters" method="get">
+  <div class="form-row"><label>Number</label><input type="text" name="q" value="{{ search }}"></div>
+  <div class="form-row"><label>Status</label><select name="status">
+    <option value="">Any</option>
+    <option value="SENT" {% if status == "SENT" %}selected{% endif %}>Sent</option>
+    <option value="FAILED" {% if status == "FAILED" %}selected{% endif %}>Failed</option>
+    <option value="QUEUED" {% if status == "QUEUED" %}selected{% endif %}>Queued</option>
+  </select></div>
+  <button class="btn ghost" type="submit">Filter</button>
+</form>
+
+{% if runs %}
+<div class="card"><h2>Recent runs</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Schedule</th><th>Day</th><th class="num">Total</th><th class="num">Sent</th>
+    <th class="num">Failed</th><th>Notes</th></tr></thead>
+  <tbody>{% for r in runs %}
+    <tr><td>{{ r.schedule.name }}</td><td>{{ r.for_date|date:"j M" }}</td>
+      <td class="num">{{ r.total }}</td><td class="num">{{ r.sent }}</td>
+      <td class="num">{{ r.failed }}</td><td class="muted">{{ r.detail|truncatechars:80 }}</td></tr>
+  {% endfor %}</tbody></table></div></div>
+{% endif %}
+
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>When</th><th>Number</th><th>Status</th><th>Message</th><th>Problem</th></tr></thead>
+  <tbody>{% for m in page %}
+    <tr><td class="muted">{{ m.created_at|date:"j M H:i" }}</td><td class="mono">{{ m.msisdn }}</td>
+      <td><span class="badge {% if m.status == 'SENT' %}ok{% elif m.status == 'FAILED' %}bad{% endif %}">{{ m.get_status_display }}</span></td>
+      <td class="muted">{{ m.body|truncatechars:70 }}</td>
+      <td class="muted">{{ m.error|default:"—" }}</td></tr>
+  {% empty %}<tr><td colspan="5" class="empty">No messages logged yet.</td></tr>{% endfor %}
+  </tbody></table></div>{% include "_pager.html" %}</div>
+{% endblock %}

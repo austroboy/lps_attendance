@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Add devices{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Add several devices</h1>
+<p>Paste the serial numbers and they all get registered at once. Adding more later works the
+same way — nothing is capped at twelve.</p></div></div>
+<div class="grid c2">
+<div class="card"><form method="post">{% csrf_token %}{% include "_form.html" %}
+  <div class="btn-row"><button class="btn" type="submit">Register devices</button>
+  <a class="btn ghost" href="{% url 'devices:list' %}">Cancel</a></div></form></div>
+<div class="card"><h3>Example</h3>
+<pre>ENS2025041, Main gate
+ENS2025042, Girls gate
+ENS2025043, Primary block
+ENS2025044</pre>
+<p class="muted">A serial with no name gets a placeholder you can rename later.</p>
+<h3 style="margin-top:14px;">Not sure of the serial?</h3>
+<p class="muted">The barcode on the side is a good guess, but the terminal may report something
+different. Register what you have, then compare against
+<a href="{% url 'devices:discovered' %}">Discovered</a> once the device is talking.</p>
+</div></div>
+{% endblock %}

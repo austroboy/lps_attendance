@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{% if is_teacher %}Teacher timetable{% else %}Student timetable{% endif %}{% endblock %}
+
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{% if is_teacher %}Teacher timetable{% else %}Student timetable{% endif %}</h1>
+    <p>{% if is_teacher %}Drag a teacher into a box and that teacher is expected at that time.
+       {% else %}Drag a class into a box and every student in it is expected at that time.
+       {% endif %}Drop the same group into several boxes for several sessions a day.
+       On a phone, tap to pick and tap a box to place.</p>
+  </div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% url 'attendance:board' %}?type={% if is_teacher %}STUDENT{% else %}TEACHER{% endif %}">
+      Switch to {% if is_teacher %}students{% else %}teachers{% endif %}</a>
+    <a class="btn" href="{% url 'attendance:slot_new' %}?type={{ slot_type }}">New time slot</a>
+  </div>
+</div>
+
+<div id="board-status" class="notice" hidden></div>
+
+<div id="board-hint" class="board-hint" hidden>
+  <span><strong data-hint-label></strong> selected — now tap a box to add it.</span>
+  <button type="button" id="board-hint-cancel" class="btn ghost small">Cancel</button>
+</div>
+
+{% if not slots %}
+  <div class="card empty">
+    <p>No time slots yet.</p>
+    <p class="muted">A slot is a window like “Morning entry, 07:30 to 08:30, late after 08:00”.
+      Make one, then drag classes into it.</p>
+    <a class="btn" href="{% url 'attendance:slot_new' %}?type={{ slot_type }}">Create the first slot</a>
+  </div>
+{% else %}
+
+<div class="board" data-board
+     data-assign-url="{% url 'attendance:board_assign' %}"
+     data-assign-class-url="{% url 'attendance:board_assign_class' %}"
+     data-csrf="{{ csrf_token }}">
+
+  <aside class="pool">
+    <h3>{% if is_teacher %}Teachers{% else %}Classes{% endif %}</h3>
+    <span class="muted">Drag onto a box on the right.</span>
+
+    {% if is_teacher %}
+      {% for t in pool %}
+        <span class="chip {% if t.pk in assigned %}used{% endif %}" draggable="true"
+              data-kind="teacher" data-id="{{ t.pk }}" data-label="{{ t.full_name }}">
+          {{ t.full_name }}</span>
+      {% empty %}
+        <p class="muted">No teachers on record yet.</p>
+      {% endfor %}
+    {% else %}
+      {% for c in classes %}
+        {% if c.sections.exists %}
+          <span class="chip class-chip" draggable="true"
+                data-kind="class" data-id="{{ c.pk }}" data-label="{{ c.name }}">
+            {{ c.name }} — whole class</span>
+          {% for s in c.sections.all %}
+            <span class="chip {% if s.pk in assigned %}used{% endif %}" draggable="true"
+                  data-kind="section" data-id="{{ s.pk }}" data-label="{{ s }}"
+                  style="margin-left:12px;">{{ s.name }}</span>
+          {% endfor %}
+        {% endif %}
+      {% empty %}
+        <p class="muted">No classes yet. <a href="{% url 'academics:class_list' %}">Add some</a>.</p>
+      {% endfor %}
+    {% endif %}
+  </aside>
+
+  <div class="slots">
+    {% for slot in slots %}
+      <section class="slot" data-slot="{{ slot.pk }}" data-name="{{ slot.name }}"
+               style="border-top-color: {{ slot.colour }};">
+        <div class="slot-head">
+          <strong>{{ slot.name }}</strong>
+          {% if not slot.is_active %}<span class="badge bad">paused</span>{% endif %}
+        </div>
+        <div class="times">
+          {{ slot.start_time|time:"H:i" }} – {{ slot.end_time|time:"H:i" }} ·
+          late after {{ slot.late_time|time:"H:i" }}
+        </div>
+        <div class="meta">{{ slot.days_label }}{% if slot.out_start_time %} · check-out
+          {{ slot.out_start_time|time:"H:i" }}–{{ slot.out_end_time|time:"H:i" }}{% endif %}</div>
+
+        <div class="drop">
+          {% if is_teacher %}
+            {% for link in slot.teachers.all %}
+              <span class="assigned" data-target="teacher:{{ link.teacher.pk }}">
+                {{ link.teacher.full_name }}
+                <button type="button" title="Remove">&times;</button></span>
+            {% endfor %}
+          {% else %}
+            {% for link in slot.sections.all %}
+              <span class="assigned" data-target="section:{{ link.section.pk }}">
+                {{ link.section }}
+                <button type="button" title="Remove">&times;</button></span>
+            {% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="actions">
+          <a href="{% url 'attendance:slot_edit' slot.pk %}">Edit</a>
+          <a href="{% url 'attendance:slot_delete' slot.pk %}"
+             onclick="return confirm('Delete “{{ slot.name }}”? Attendance records for this slot go too.')">Delete</a>
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3>How a punch becomes attendance</h3>
+  <p class="muted">When someone verifies on a terminal, the server looks up their device user id,
+    finds the slots their class is in today, and picks the one whose window contains that moment.
+    Before the late cut-off it is present; after it, late. Anyone with no punch by the time the
+    window closes is marked absent by the scheduled job.</p>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}<script src="{% static 'js/board.js' %}"></script>{% endblock %}

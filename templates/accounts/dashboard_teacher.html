@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ teacher.full_name|default:user.get_full_name }}</h1>
+  <p>{{ today|date:"j F Y" }} · {{ students }} student{{ students|pluralize }} in your classes.</p></div>
+  <a class="btn" href="{% url 'attendance:register' %}">Open register</a>
+</div>
+
+{% if not sections %}
+  <div class="notice">No classes are assigned to you yet. Ask an admin to grant access.</div>
+{% endif %}
+
+<div class="grid c4" style="margin-bottom:18px;">
+  <div class="stat"><div class="n">{{ counts.PRESENT|default:0 }}</div><div class="k">Present</div></div>
+  <div class="stat"><div class="n">{{ counts.LATE|default:0 }}</div><div class="k">Late</div></div>
+  <div class="stat"><div class="n">{{ counts.ABSENT|default:0 }}</div><div class="k">Absent</div></div>
+  <div class="stat"><div class="n">{{ sections|length }}</div><div class="k">Classes</div></div>
+</div>
+
+<div class="grid c2">
+<div class="card">
+  <h2>Absent today</h2>
+  {% if absent_today %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>Roll</th><th>Name</th><th>Class</th></tr></thead><tbody>
+      {% for r in absent_today %}
+        <tr><td>{{ r.student.roll_no }}</td><td>{{ r.student.full_name }}</td>
+          <td>{{ r.student.section }}</td></tr>
+      {% endfor %}</tbody></table></div>
+  {% else %}<div class="empty">Nobody is marked absent yet.</div>{% endif %}
+</div>
+<div class="card">
+  <h2>Your own attendance</h2>
+  {% if my_attendance %}
+    <table><tbody>
+    {% for r in my_attendance %}
+      <tr><td>{{ r.time_slot.name }}</td>
+        <td><span class="badge {{ r.status }}">{{ r.get_status_display }}</span></td>
+        <td>{{ r.in_time|date:"H:i"|default:"—" }}</td></tr>
+    {% endfor %}</tbody></table>
+  {% else %}<div class="empty">No record for you today.</div>{% endif %}
+</div>
+</div>
+{% endblock %}

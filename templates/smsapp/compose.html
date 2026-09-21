@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Send a message{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Send a message</h1>
+<p>One-off notices — an exam date, a closure, a reminder. This does not touch attendance.</p></div></div>
+{% if not gateway_ready %}<div class="notice warning">Gateway credentials are not set, so this
+will fail. Add them before sending.</div>{% endif %}
+<div class="card" style="max-width:620px;">
+  <form method="post">{% csrf_token %}{% include "_form.html" %}
+    <button class="btn" type="submit">Send</button></form>
+</div>
+{% endblock %}

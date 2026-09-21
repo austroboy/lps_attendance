@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ title }}</h1>
+<p>Set when it goes out and who qualifies. Drag the classes in afterwards on the board.</p></div></div>
+{% if not has_templates %}<div class="notice">You need a template first.
+  <a href="{% url 'smsapp:template_new' %}">Write one</a>.</div>{% endif %}
+<div class="grid c2">
+<div class="card"><form method="post">{% csrf_token %}{% include "_form.html" %}
+  <div class="btn-row"><button class="btn" type="submit">Save schedule</button>
+  <a class="btn ghost" href="{% url 'smsapp:board' %}">Cancel</a></div></form></div>
+<div class="card"><h3>A worked example</h3>
+<dl class="kv">
+  <dt>Name</dt><dd>Absent alert</dd>
+  <dt>Audience</dt><dd>Student guardian</dd>
+  <dt>Slot</dt><dd>Morning entry</dd>
+  <dt>Statuses</dt><dd>Absent</dd>
+  <dt>Sends at</dt><dd>09:30, Sunday to Thursday</dd>
+</dl>
+<p class="muted" style="margin-top:12px;">Set the send time after the slot's closing time,
+otherwise absences have not been worked out yet and the message goes to nobody.</p></div>
+</div>
+{% endblock %}

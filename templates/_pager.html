@@ -1,0 +1,28 @@
+{% if page %}
+<nav class="pager" aria-label="Pagination">
+  {% if page.has_previous %}
+    <a class="btn ghost small" href="{% querystring page=1 %}" title="First page">&laquo; First</a>
+    <a class="btn ghost small" href="{% querystring page=page.previous_page_number %}">Previous</a>
+  {% endif %}
+
+  <span class="muted">
+    Page {{ page.number }} of {{ page.paginator.num_pages }}
+    · {{ page.paginator.count }} row{{ page.paginator.count|pluralize }}
+  </span>
+
+  {% if page.has_next %}
+    <a class="btn ghost small" href="{% querystring page=page.next_page_number %}">Next</a>
+    <a class="btn ghost small" href="{% querystring page=page.paginator.num_pages %}" title="Last page">Last &raquo;</a>
+  {% endif %}
+
+  {% if page.paginator.count > 25 %}
+    <span class="per-page muted">
+      Show
+      <a href="{% querystring page=1 per_page=25 %}" {% if page.paginator.per_page == 25 %}class="on"{% endif %}>25</a>
+      <a href="{% querystring page=1 per_page=50 %}" {% if page.paginator.per_page == 50 %}class="on"{% endif %}>50</a>
+      <a href="{% querystring page=1 per_page=100 %}" {% if page.paginator.per_page == 100 %}class="on"{% endif %}>100</a>
+      <a href="{% querystring page=1 per_page=200 %}" {% if page.paginator.per_page == 200 %}class="on"{% endif %}>200</a>
+    </span>
+  {% endif %}
+</nav>
+{% endif %}

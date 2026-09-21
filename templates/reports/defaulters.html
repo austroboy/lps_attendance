@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Low attendance{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Low attendance</h1>
+  <p>{{ total }} student{{ total|pluralize }} below {{ threshold }}% between
+  {{ start|date:"j M" }} and {{ end|date:"j M Y" }}.</p></div>
+  <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
+</div>
+
+<form class="filters" method="get">
+  <div class="form-row"><label>From</label><input type="date" name="from" value="{{ start|date:'Y-m-d' }}"></div>
+  <div class="form-row"><label>To</label><input type="date" name="to" value="{{ end|date:'Y-m-d' }}"></div>
+  <div class="form-row"><label>Below</label><input type="number" name="threshold" value="{{ threshold }}" min="1" max="100"></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+
+<div class="card">
+{% if page %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Roll</th><th>Name</th><th>Class</th><th class="num">Present</th>
+    <th class="num">Absent</th><th class="num">Total</th><th class="num">Rate</th></tr></thead>
+  <tbody>{% for r in page %}
+    <tr><td>{{ r.student.roll_no|default:"—" }}</td><td>{{ r.student.full_name }}</td>
+      <td>{{ r.student.section }}</td><td class="num">{{ r.present }}</td>
+      <td class="num">{{ r.absent }}</td><td class="num">{{ r.total }}</td>
+      <td class="num"><span class="badge {% if r.rate < 60 %}bad{% else %}LATE{% endif %}">{{ r.rate }}%</span></td></tr>
+  {% endfor %}</tbody></table></div>
+{% include "_pager.html" %}
+{% else %}
+<div class="empty">Nobody is below {{ threshold }}% in this range.</div>
+{% endif %}
+</div>
+{% endblock %}

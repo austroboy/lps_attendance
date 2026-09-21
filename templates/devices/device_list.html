@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Devices{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Terminals</h1>
+    <p>{{ online }} of {{ devices|length }} online. A terminal counts as online if it has
+      checked in within the last 90 seconds.</p>
+  </div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% url 'devices:discovered' %}">
+      Discovered{% if unknown_count %} ({{ unknown_count }}){% endif %}</a>
+    <a class="btn ghost" href="{% url 'devices:new' %}">Add one</a>
+    <a class="btn" href="{% url 'devices:bulk' %}">Add many</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Point the terminals here</h2>
+  <p>On each device: <strong>Menu → Comm / Network → Server</strong>. Set the server address to
+    this machine's IP and the port to the one this app is served on. If the device asks for a
+    path, use <code>/ebkn/</code>.</p>
+  <div class="kv">
+    <dt>Endpoint</dt><dd class="mono">{{ endpoint }}</dd>
+    <dt>Method</dt><dd>HTTP POST, <span class="mono">application/octet-stream</span></dd>
+    <dt>Identified by</dt><dd>the <span class="mono">dev_id</span> header, not the path</dd>
+  </div>
+  <p class="muted" style="margin-top:10px;">
+    Any path works — this server recognises terminal traffic by its headers, so a device that
+    posts to <span class="mono">/</span> is handled just the same.
+    Open <a href="{{ endpoint }}">{{ endpoint }}</a> in a browser on the device's network to
+    confirm the machine is reachable.
+  </p>
+</div>
+
+{% if devices %}
+<div class="card">
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Name</th><th>Serial (dev_id)</th><th>Purpose</th><th>Status</th>
+      <th>Firmware</th><th class="num">Punches</th><th>Last heard</th><th></th>
+    </tr></thead>
+    <tbody>
+    {% for d in devices %}
+      <tr>
+        <td><a href="{% url 'devices:detail' d.pk %}">{{ d.name }}</a>
+          {% if d.location %}<div class="muted">{{ d.location }}</div>{% endif %}</td>
+        <td class="mono">{{ d.serial_number }}</td>
+        <td>{{ d.get_purpose_display }}</td>
+        <td><span class="dot {% if d.is_online %}on{% else %}off{% endif %}"></span>{{ d.status_label }}</td>
+        <td class="muted">{{ d.firmware|default:"—" }}</td>
+        <td class="num">{{ d.punch_count }}</td>
+        <td class="muted">{% if d.last_seen %}{{ d.last_seen|timesince }} ago{% else %}never{% endif %}</td>
+        <td><a class="btn ghost small" href="{% url 'devices:edit' d.pk %}">Edit</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% else %}
+<div class="card empty">
+  <p>No terminals registered yet.</p>
+  <p class="muted">If you already know the twelve serial numbers, add them all at once. If you do
+    not, power one on, point it at this server, and its serial will appear under Discovered.</p>
+  <div class="btn-row" style="justify-content:center;">
+    <a class="btn" href="{% url 'devices:bulk' %}">Add many</a>
+    <a class="btn ghost" href="{% url 'devices:discovered' %}">Check Discovered</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Device users{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Device users</h1>
+<p>The terminal knows people by a number. This is where that number gets attached to a student
+or a teacher — until it is, their punches will not become attendance.</p></div></div>
+
+<form class="filters" method="get">
+  <div class="form-row"><label>Terminal</label><select name="device" onchange="this.form.submit()">
+    <option value="">All terminals</option>
+    {% for d in devices %}<option value="{{ d.pk }}" {% if device_id == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+  </select></div>
+</form>
+
+<div class="card">
+{% if page %}
+<div class="table-wrap"><table>
+  <thead><tr><th>User id</th><th>Name on device</th><th>Terminal</th><th>Linked to</th><th>Link</th></tr></thead>
+  <tbody>{% for row in page %}
+    <tr>
+      <td class="mono">{{ row.enrollment.device_user_id }}</td>
+      <td>{{ row.enrollment.user_name|default:"—" }}</td>
+      <td>{{ row.enrollment.device.name }}</td>
+      <td>{% if row.student %}<span class="badge ok">{{ row.student.full_name }} · {{ row.student.section }}</span>
+        {% elif row.teacher %}<span class="badge ok">{{ row.teacher.full_name }} · teacher</span>
+        {% else %}<span class="badge bad">nobody</span>{% endif %}</td>
+      <td><form method="post" class="btn-row">{% csrf_token %}
+        <input type="hidden" name="device_user_id" value="{{ row.enrollment.device_user_id }}">
+        <select name="target" style="min-width:210px;">
+          <option value="">Choose a person…</option>
+          <optgroup label="Students">
+          {% for s in students %}<option value="student:{{ s.pk }}">{{ s.full_name }} — {{ s.section }}</option>{% endfor %}
+          </optgroup>
+          <optgroup label="Teachers">
+          {% for t in teachers %}<option value="teacher:{{ t.pk }}">{{ t.full_name }}</option>{% endfor %}
+          </optgroup>
+        </select>
+        <button class="btn small" type="submit">Link</button></form></td>
+    </tr>
+  {% endfor %}</tbody></table></div>
+{% include "_pager.html" %}
+{% else %}
+<div class="empty">
+  <p>No enrolment data yet.</p>
+  <p class="muted">Open a terminal and queue <span class="mono">GET_USER_ID_LIST</span>, or enrol
+  someone on the device itself — new enrolments are pushed here automatically.
+  You can also just type the number straight into each student's record.</p>
+</div>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Discovered devices{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Discovered terminals</h1>
+<p>Any device that contacted this server with an unregistered serial shows up here, along with
+the first payload it sent. This is how you learn a device's real id without the vendor.</p></div>
+<a class="btn ghost" href="{% url 'devices:list' %}">Back to devices</a></div>
+
+{% if unknown %}
+  {% for u in unknown %}
+  <div class="card">
+    <div class="page-head" style="margin-bottom:10px;">
+      <div><h2 class="mono">{{ u.serial_number }}</h2>
+        <p>{{ u.hit_count }} request{{ u.hit_count|pluralize }} · last one
+          {{ u.last_seen|timesince }} ago{% if u.ip_address %} from {{ u.ip_address }}{% endif %}
+          · {{ u.last_request_code|default:"unknown request" }}</p></div>
+    </div>
+    <form method="post" class="filters">{% csrf_token %}
+      <input type="hidden" name="serial" value="{{ u.serial_number }}">
+      <div class="form-row"><label>Name it</label>
+        <input type="text" name="name" placeholder="e.g. Main gate" required></div>
+      <div class="form-row"><label>Used for</label><select name="purpose">
+        {% for value, label in purposes %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select></div>
+      <button class="btn" type="submit">Register this device</button>
+      <a class="btn ghost" href="{% url 'devices:discovered_forget' u.pk %}">Ignore</a>
+    </form>
+    {% if u.last_payload %}
+      <details style="margin-top:10px;"><summary class="muted">What it sent</summary>
+        <pre>{{ u.last_payload }}</pre></details>
+    {% endif %}
+  </div>
+  {% endfor %}
+{% else %}
+  <div class="card empty">
+    <p>Nothing new has called in.</p>
+    <p class="muted">Point a terminal at this server and refresh. If it still stays empty, the
+    device is not reaching the machine — check the IP, the port, and that both are on the same
+    network. The <a href="{% url 'devices:traffic' %}">protocol log</a> records every request
+    that arrives, even malformed ones.</p>
+  </div>
+{% endif %}
+{% endblock %}

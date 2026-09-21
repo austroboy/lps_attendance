@@ -1,0 +1,171 @@
+{% load static %}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Attendance{% endblock %} · LPS</title>
+  <link rel="icon" href="{% static 'favicon.svg' %}" type="image/svg+xml">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<div class="shell">
+  <button class="scrim" id="scrim" type="button" tabindex="-1" aria-hidden="true"></button>
+  <nav class="sidebar" id="sidebar">
+    {% with vn=request.resolver_match.view_name slot_type=request.GET.type %}
+    <div class="brand">
+      <strong>LPS Attendance</strong>
+      <span>Face terminals, timetables, SMS</span>
+    </div>
+
+    <a href="{% url 'accounts:home' %}" class="{% if vn == 'accounts:home' %}on{% endif %}">Dashboard</a>
+
+    {% if nav_is_admin %}
+      <div class="group">Terminals</div>
+      <a href="{% url 'devices:list' %}" class="{% if vn == 'devices:list' %}on{% endif %}">Devices</a>
+      <a href="{% url 'devices:discovered' %}" class="{% if vn == 'devices:discovered' %}on{% endif %}">Discovered</a>
+      <a href="{% url 'devices:enrollments' %}" class="{% if vn == 'devices:enrollments' %}on{% endif %}">Device users</a>
+      <a href="{% url 'devices:punches' %}" class="{% if vn == 'devices:punches' %}on{% endif %}">Raw punches</a>
+      <a href="{% url 'devices:traffic' %}" class="{% if vn == 'devices:traffic' %}on{% endif %}">Protocol log</a>
+
+      <div class="group">School</div>
+      <a href="{% url 'academics:class_list' %}" class="{% if vn == 'academics:class_list' %}on{% endif %}">Classes</a>
+      <a href="{% url 'academics:student_list' %}" class="{% if vn == 'academics:student_list' %}on{% endif %}">Students</a>
+      <a href="{% url 'academics:teacher_list' %}" class="{% if vn == 'academics:teacher_list' %}on{% endif %}">Teachers</a>
+      <a href="{% url 'academics:access_list' %}" class="{% if vn == 'academics:access_list' %}on{% endif %}">Teacher access</a>
+      <a href="{% url 'academics:holiday_list' %}" class="{% if vn == 'academics:holiday_list' %}on{% endif %}">Holidays</a>
+
+      <div class="group">Attendance</div>
+      <a href="{% url 'attendance:board' %}" class="{% if vn == 'attendance:board' and slot_type != 'TEACHER' %}on{% endif %}">Student timetable</a>
+      <a href="{% url 'attendance:board' %}?type=TEACHER" class="{% if vn == 'attendance:board' and slot_type == 'TEACHER' %}on{% endif %}">Teacher timetable</a>
+      <a href="{% url 'attendance:register' %}" class="{% if vn == 'attendance:register' %}on{% endif %}">Daily register</a>
+      <a href="{% url 'attendance:teacher_register' %}" class="{% if vn == 'attendance:teacher_register' %}on{% endif %}">Teacher register</a>
+      <a href="{% url 'attendance:maintenance' %}" class="{% if vn == 'attendance:maintenance' %}on{% endif %}">Recalculate</a>
+
+      <div class="group">SMS</div>
+      <a href="{% url 'smsapp:board' %}" class="{% if vn == 'smsapp:board' %}on{% endif %}">SMS schedules</a>
+      <a href="{% url 'smsapp:templates' %}" class="{% if vn == 'smsapp:templates' %}on{% endif %}">Templates</a>
+      <a href="{% url 'smsapp:compose' %}" class="{% if vn == 'smsapp:compose' %}on{% endif %}">Send a message</a>
+      <a href="{% url 'smsapp:logs' %}" class="{% if vn == 'smsapp:logs' %}on{% endif %}">SMS log</a>
+
+      <div class="group">Reports</div>
+      <a href="{% url 'reports:daily' %}" class="{% if vn == 'reports:daily' %}on{% endif %}">Daily summary</a>
+      <a href="{% url 'reports:monthly' %}" class="{% if vn == 'reports:monthly' %}on{% endif %}">Monthly sheet</a>
+      <a href="{% url 'reports:defaulters' %}" class="{% if vn == 'reports:defaulters' %}on{% endif %}">Low attendance</a>
+      <a href="{% url 'reports:teachers' %}" class="{% if vn == 'reports:teachers' %}on{% endif %}">Teacher attendance</a>
+      <a href="{% url 'reports:devices' %}" class="{% if vn == 'reports:devices' %}on{% endif %}">Device activity</a>
+
+      {% if nav_is_superadmin %}
+        <div class="group">System</div>
+        <a href="{% url 'accounts:user_list' %}" class="{% if vn == 'accounts:user_list' %}on{% endif %}">Users</a>
+        <a href="/django-admin/">Django admin</a>
+      {% endif %}
+
+    {% elif nav_is_teacher %}
+      <div class="group">My classes</div>
+      <a href="{% url 'attendance:register' %}" class="{% if vn == 'attendance:register' %}on{% endif %}">Daily register</a>
+      <a href="{% url 'academics:student_list' %}" class="{% if vn == 'academics:student_list' %}on{% endif %}">Students</a>
+      <a href="{% url 'reports:daily' %}" class="{% if vn == 'reports:daily' %}on{% endif %}">Daily summary</a>
+      <a href="{% url 'reports:monthly' %}" class="{% if vn == 'reports:monthly' %}on{% endif %}">Monthly sheet</a>
+      <a href="{% url 'reports:defaulters' %}" class="{% if vn == 'reports:defaulters' %}on{% endif %}">Low attendance</a>
+      <div class="group">Me</div>
+      <a href="{% url 'attendance:teacher_register' %}" class="{% if vn == 'attendance:teacher_register' %}on{% endif %}">My attendance</a>
+
+    {% elif nav_is_student %}
+      <div class="group">Me</div>
+      <a href="{% url 'reports:mine' %}" class="{% if vn == 'reports:mine' %}on{% endif %}">My attendance</a>
+    {% endif %}
+
+    <div class="group">Account</div>
+    <a href="{% url 'accounts:change_password' %}" class="{% if vn == 'accounts:change_password' %}on{% endif %}">Change password</a>
+    {% endwith %}
+  </nav>
+
+  <div class="main">
+    <header class="topbar">
+      <button class="menu-btn" id="menuBtn" type="button"
+              aria-label="Open the menu" aria-controls="sidebar" aria-expanded="false">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" aria-hidden="true">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+      </button>
+      <span class="topbar-brand">LPS Attendance</span>
+      <div class="who">
+        Signed in as <strong>{{ user.get_full_name|default:user.username }}</strong>
+        — {{ user.get_role_display }}
+      </div>
+      <form method="post" action="{% url 'accounts:logout' %}" style="margin-left:auto;">
+        {% csrf_token %}
+        <button class="btn ghost small" type="submit">Sign out</button>
+      </form>
+    </header>
+
+    <main class="content">
+      {% if user.must_change_password %}
+        <div class="notice warning">
+          You are still on the password you were given.
+          <a href="{% url 'accounts:change_password' %}">Set your own</a>.
+        </div>
+      {% endif %}
+
+      {% for message in messages %}
+        <div class="notice {{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script>
+/*
+ * The navigation drawer.
+ *
+ * Below 900px the sidebar is off canvas. Anything that should dismiss it does:
+ * the backdrop, Escape, following a link, and widening the window past the
+ * breakpoint (otherwise rotating a phone leaves a stuck drawer over a desktop
+ * layout).
+ */
+(function () {
+  const button = document.getElementById("menuBtn");
+  const sidebar = document.getElementById("sidebar");
+  const scrim = document.getElementById("scrim");
+  if (!button || !sidebar) return;
+
+  const setOpen = (open) => {
+    sidebar.classList.toggle("open", open);
+    document.body.classList.toggle("nav-open", open);
+    button.setAttribute("aria-expanded", open ? "true" : "false");
+    button.setAttribute("aria-label", open ? "Close the menu" : "Open the menu");
+    if (open) {
+      const first = sidebar.querySelector("a");
+      if (first) first.focus({ preventScroll: true });
+    }
+  };
+
+  button.addEventListener("click", () => setOpen(!sidebar.classList.contains("open")));
+  scrim.addEventListener("click", () => setOpen(false));
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && sidebar.classList.contains("open")) {
+      setOpen(false);
+      button.focus();
+    }
+  });
+
+  sidebar.addEventListener("click", (event) => {
+    if (event.target.closest("a")) setOpen(false);
+  });
+
+  let wasNarrow = window.matchMedia("(max-width: 900px)").matches;
+  window.addEventListener("resize", () => {
+    const narrow = window.matchMedia("(max-width: 900px)").matches;
+    if (wasNarrow && !narrow) setOpen(false);
+    wasNarrow = narrow;
+  });
+})();
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

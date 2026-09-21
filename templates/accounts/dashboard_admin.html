@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>Today, {{ today|date:"j F Y" }}</h1>
+    <p>{{ total_marked }} record{{ total_marked|pluralize }} so far, {{ rate }}% present.</p>
+  </div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% url 'attendance:register' %}">Open register</a>
+    <a class="btn" href="{% url 'devices:list' %}">Devices</a>
+  </div>
+</div>
+
+{% if unknown_devices %}
+  <div class="notice warning">
+    {{ unknown_devices }} terminal{{ unknown_devices|pluralize }} contacted this server with a
+    serial number that is not registered.
+    <a href="{% url 'devices:discovered' %}">See what they sent</a> — this is where you find the
+    real device id.
+  </div>
+{% endif %}
+{% if unmatched_punches %}
+  <div class="notice warning">
+    {{ unmatched_punches }} punch{{ unmatched_punches|pluralize:"es" }} could not be matched to
+    anyone. <a href="{% url 'devices:enrollments' %}">Link device user ids to students</a>.
+  </div>
+{% endif %}
+{% if not slots %}
+  <div class="notice">
+    No time slots yet. Attendance stays blank until at least one slot exists and has classes in
+    it. <a href="{% url 'attendance:board' %}">Set up the timetable</a>.
+  </div>
+{% endif %}
+
+<div class="grid c4" style="margin-bottom:18px;">
+  <div class="stat"><div class="n">{{ counts.PRESENT|default:0 }}</div><div class="k">Present</div></div>
+  <div class="stat"><div class="n">{{ counts.LATE|default:0 }}</div><div class="k">Late</div></div>
+  <div class="stat"><div class="n">{{ counts.ABSENT|default:0 }}</div><div class="k">Absent</div></div>
+  <div class="stat"><div class="n">{{ counts.LEAVE|default:0 }}</div><div class="k">On leave</div></div>
+</div>
+
+<div class="grid c4" style="margin-bottom:18px;">
+  <div class="stat"><div class="n">{{ devices_online }}/{{ devices|length }}</div><div class="k">Terminals online</div></div>
+  <div class="stat"><div class="n">{{ students }}</div><div class="k">Active students</div></div>
+  <div class="stat {% if unmapped_students %}warn{% endif %}"><div class="n">{{ unmapped_students }}</div><div class="k">Students with no device id</div></div>
+  <div class="stat {% if pending_punches %}warn{% endif %}"><div class="n">{{ pending_punches }}</div><div class="k">Punches waiting to resolve</div></div>
+</div>
+
+<div class="grid c2">
+  <div class="card">
+    <h2>Terminals</h2>
+    {% if devices %}
+      <div class="table-wrap"><table>
+        <thead><tr><th>Device</th><th>Serial</th><th>Status</th><th class="num">Punches</th><th>Last heard</th></tr></thead>
+        <tbody>
+        {% for d in devices %}
+          <tr>
+            <td><a href="{% url 'devices:detail' d.pk %}">{{ d.name }}</a></td>
+            <td class="mono">{{ d.serial_number }}</td>
+            <td><span class="dot {% if d.is_online %}on{% else %}off{% endif %}"></span>{{ d.status_label }}</td>
+            <td class="num">{{ d.punch_count }}</td>
+            <td class="muted">{% if d.last_seen %}{{ d.last_seen|timesince }} ago{% else %}never{% endif %}</td>
+          </tr>
+        {% endfor %}
+        </tbody></table></div>
+    {% else %}
+      <div class="empty">
+        No terminals registered yet.<br>
+        <a class="btn" style="margin-top:10px;" href="{% url 'devices:bulk' %}">Add your devices</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Latest punches</h2>
+    {% if recent_punches %}
+      <div class="table-wrap"><table>
+        <thead><tr><th>Time</th><th>Device user</th><th>Terminal</th><th>Result</th></tr></thead>
+        <tbody>
+        {% for p in recent_punches %}
+          <tr><td>{{ p.punch_time|date:"H:i:s" }}</td><td class="mono">{{ p.device_user_id }}</td>
+            <td>{{ p.device.name }}</td><td class="muted">{{ p.process_note|default:"—" }}</td></tr>
+        {% endfor %}
+        </tbody></table></div>
+      <p class="muted" style="margin-top:10px;">
+        <a href="{% url 'devices:punches' %}">Every punch</a> ·
+        <a href="{% url 'devices:traffic' %}">Raw protocol log</a>
+      </p>
+    {% else %}
+      <div class="empty">
+        Nothing has come in yet. Once a terminal is registered and pointed at this server,
+        punches land here within a second or two.
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>SMS today</h2>
+  <p class="muted">{{ sms_today }} message{{ sms_today|pluralize }} queued or sent,
+    {{ sms_failed }} failed. <a href="{% url 'smsapp:logs' %}">Open the log</a>.</p>
+</div>
+
+{% endblock %}

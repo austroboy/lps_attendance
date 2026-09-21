@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>{{ title }}</h1></div></div>
+<div class="grid c2">
+<div class="card"><form method="post">{% csrf_token %}{% include "_form.html" %}
+  <div class="btn-row"><button class="btn" type="submit">Save template</button>
+  <a class="btn ghost" href="{% url 'smsapp:templates' %}">Cancel</a></div></form></div>
+<div class="card"><h3>Placeholders</h3>
+<table><tbody>
+  <tr><td class="mono">{name}</td><td>Student or teacher name</td></tr>
+  <tr><td class="mono">{roll}</td><td>Roll number, or employee code</td></tr>
+  <tr><td class="mono">{class}</td><td>Class name</td></tr>
+  <tr><td class="mono">{section}</td><td>Section name</td></tr>
+  <tr><td class="mono">{date}</td><td>Date, as 14-09-2026</td></tr>
+  <tr><td class="mono">{time}</td><td>Check-in time, or a dash</td></tr>
+  <tr><td class="mono">{status}</td><td>Present, Late, Absent…</td></tr>
+  <tr><td class="mono">{slot}</td><td>Time slot name</td></tr>
+  <tr><td class="mono">{guardian}</td><td>Guardian's name</td></tr>
+  <tr><td class="mono">{school}</td><td>School name</td></tr>
+</tbody></table>
+<h3 style="margin-top:14px;">Example</h3>
+<pre>Dear {guardian}, {name} ({class}-{section}) was
+absent on {date}. - {school}</pre>
+<p class="muted">Keep it under 160 characters for a single-part English SMS. Bengali text is
+Unicode, so a single part is only 70 characters.</p></div>
+</div>
+{% endblock %}

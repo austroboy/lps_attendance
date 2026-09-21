@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Teacher attendance{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Teacher attendance</h1>
+  <p>{{ start|date:"j M" }} to {{ end|date:"j M Y" }}.</p></div>
+  <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
+</div>
+<form class="filters" method="get">
+  <div class="form-row"><label>From</label><input type="date" name="from" value="{{ start|date:'Y-m-d' }}"></div>
+  <div class="form-row"><label>To</label><input type="date" name="to" value="{{ end|date:'Y-m-d' }}"></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+<div class="card">
+{% if rows %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Code</th><th>Name</th><th class="num">Present</th><th class="num">Late</th>
+    <th class="num">Absent</th><th class="num">Days</th></tr></thead>
+  <tbody>{% for r in rows %}{% if r.teacher %}
+    <tr><td class="mono">{{ r.teacher.employee_code }}</td><td>{{ r.teacher.full_name }}</td>
+      <td class="num">{{ r.present }}</td><td class="num">{{ r.late }}</td>
+      <td class="num">{{ r.absent }}</td><td class="num">{{ r.total }}</td></tr>
+  {% endif %}{% endfor %}</tbody></table></div>
+{% else %}
+<div class="empty"><p>No teacher records in this range.</p>
+  <p class="muted">Teachers need a device user id and a place on the teacher timetable before
+  their punches turn into records.</p></div>
+{% endif %}
+</div>
+{% endblock %}

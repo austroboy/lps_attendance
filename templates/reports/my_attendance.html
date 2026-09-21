@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}My attendance{% endblock %}
+{% block content %}
+{% if student %}
+<div class="page-head"><div>
+  <h1>{{ student.full_name }}</h1>
+  <p>{{ student.section }} · roll {{ student.roll_no|default:"—" }}</p></div></div>
+
+<form class="filters" method="get">
+  {% if request.GET.student %}<input type="hidden" name="student" value="{{ student.pk }}">{% endif %}
+  <div class="form-row"><label>Month</label><select name="month">
+    {% for value, label in months %}<option value="{{ value }}" {% if month == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="form-row"><label>Year</label><select name="year">
+    {% for y in years %}<option value="{{ y }}" {% if year == y %}selected{% endif %}>{{ y }}</option>{% endfor %}
+  </select></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+
+<div class="grid c4" style="margin-bottom:16px;">
+  <div class="stat"><div class="n">{{ counts.PRESENT }}</div><div class="k">Present</div></div>
+  <div class="stat"><div class="n">{{ counts.LATE }}</div><div class="k">Late</div></div>
+  <div class="stat"><div class="n">{{ counts.ABSENT }}</div><div class="k">Absent</div></div>
+  <div class="stat"><div class="n">{{ counts.rate }}%</div><div class="k">Attendance rate</div></div>
+</div>
+
+<div class="card">
+  <h2>{{ month_name }} {{ year }}</h2>
+  {% if records %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Date</th><th>Slot</th><th>Status</th><th>In</th><th>Out</th><th>Note</th></tr></thead>
+    <tbody>{% for r in records %}
+      <tr><td>{{ r.date|date:"j M, D" }}</td><td>{{ r.time_slot.name }}</td>
+        <td><span class="badge {{ r.status }}">{{ r.get_status_display }}</span></td>
+        <td>{{ r.in_time|date:"H:i"|default:"—" }}</td>
+        <td>{{ r.out_time|date:"H:i"|default:"—" }}</td>
+        <td class="muted">{{ r.note|default:"" }}</td></tr>
+    {% endfor %}</tbody></table></div>
+  {% else %}
+  <div class="empty">Nothing recorded for this month.</div>
+  {% endif %}
+</div>
+
+<p class="muted">Think something here is wrong? Speak to your class teacher — they can correct a
+record.</p>
+
+{% else %}
+<div class="page-head"><div><h1>My attendance</h1></div></div>
+<div class="card empty">
+  <p>This account is not linked to a student record.</p>
+  <p class="muted">Ask the office to connect your login to your admission number.</p>
+</div>
+{% endif %}
+{% endblock %}

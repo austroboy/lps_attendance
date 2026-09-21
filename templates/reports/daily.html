@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Daily summary{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Daily summary · {{ day|date:"j F Y" }}</h1>
+  <p>{{ totals.total }} record{{ totals.total|pluralize }}, {{ totals.rate }}% present overall.</p></div>
+  <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
+</div>
+
+<form class="filters" method="get">
+  <div class="form-row"><label>Date</label>
+    <input type="date" name="date" value="{{ day|date:'Y-m-d' }}"></div>
+  <button class="btn ghost" type="submit">Show</button>
+</form>
+
+<div class="grid c4" style="margin-bottom:16px;">
+  <div class="stat"><div class="n">{{ totals.PRESENT }}</div><div class="k">Present</div></div>
+  <div class="stat"><div class="n">{{ totals.LATE }}</div><div class="k">Late</div></div>
+  <div class="stat"><div class="n">{{ totals.ABSENT }}</div><div class="k">Absent</div></div>
+  <div class="stat"><div class="n">{{ totals.rate }}%</div><div class="k">Attendance rate</div></div>
+</div>
+
+<div class="card">
+{% if rows %}
+<div class="table-wrap"><table>
+  <thead><tr><th>Class</th><th class="num">Present</th><th class="num">Late</th>
+    <th class="num">Absent</th><th class="num">Leave</th><th class="num">Total</th>
+    <th class="num">Rate</th></tr></thead>
+  <tbody>{% for section, b in rows %}
+    <tr><td>{{ section }}</td><td class="num">{{ b.PRESENT }}</td><td class="num">{{ b.LATE }}</td>
+      <td class="num">{{ b.ABSENT }}</td><td class="num">{{ b.LEAVE }}</td>
+      <td class="num">{{ b.total }}</td><td class="num">{{ b.rate }}%</td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}
+<div class="empty"><p>Nothing recorded for this day.</p>
+  <p class="muted">Either no terminal reported in, or the slots for today have not closed yet.
+  <a href="{% url 'attendance:maintenance' %}">Recalculate</a> if you have just fixed the
+  timetable.</p></div>
+{% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Preview{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ schedule.name }} · preview</h1>
+  <p>{{ total }} message{{ total|pluralize }} would go out for {{ day|date:"j F Y" }}.
+  Nothing has been sent.</p></div>
+  <a class="btn ghost" href="{% url 'smsapp:board' %}">Back</a>
+</div>
+
+<form class="filters" method="get">
+  <div class="form-row"><label>Day</label><input type="date" name="date" value="{{ day|date:'Y-m-d' }}"></div>
+  <button class="btn ghost" type="submit">Preview</button>
+</form>
+
+{% if page %}
+<form method="post" action="{% url 'smsapp:schedule_run' schedule.pk %}" class="card">
+  {% csrf_token %}
+  <input type="hidden" name="date" value="{{ day|date:'Y-m-d' }}">
+  <div class="btn-row">
+    <button class="btn" type="submit" {% if not gateway_ready %}disabled{% endif %}
+      onclick="return confirm('Send {{ total }} message(s) now?')">Send these now</button>
+    <label style="font-weight:400;"><input type="checkbox" name="force" value="1">
+      Send even if this schedule already ran today</label>
+  </div>
+  {% if not gateway_ready %}<p class="muted" style="margin-top:8px;">Sending is disabled until the
+  gateway credentials are set.</p>{% endif %}
+</form>
+
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Recipient</th><th>Number</th><th>Message</th><th class="num">Chars</th></tr></thead>
+  <tbody>{% for person, number, text in page %}
+    <tr><td>{{ person }}</td><td class="mono">{{ number }}</td><td>{{ text }}</td>
+      <td class="num">{{ text|length }}</td></tr>
+  {% endfor %}</tbody></table></div>{% include "_pager.html" %}</div>
+{% else %}
+<div class="card empty">
+  <p>Nobody matches on this day.</p>
+  <p class="muted">Check that classes are dropped into this schedule, that attendance for the day
+  has been worked out, and that the statuses you chose actually occurred.</p>
+</div>
+{% endif %}
+{% endblock %}

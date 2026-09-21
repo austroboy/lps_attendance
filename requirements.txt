@@ -1,0 +1,11 @@
+Django>=5.0,<5.3
+requests>=2.31
+openpyxl>=3.1          # reading and writing the student import workbook
+Pillow>=10.0           # student photos and punch captures
+celery>=5.3            # background import jobs
+redis>=5.0             # celery broker
+
+# production
+gunicorn>=22           # 22+ is required: the unit file uses --header-map, see deploy/install.sh
+psycopg[binary]>=3.1; sys_platform == "linux"   # server only; the Mac uses SQLite and need not build it
+whitenoise>=6.6        # static files served by the app, no nginx/SELinux path juggling

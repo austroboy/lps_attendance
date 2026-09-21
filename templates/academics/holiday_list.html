@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Holidays{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Holidays</h1>
+<p>On a holiday no records are created and nobody is marked absent. Punches are still stored.</p></div></div>
+<div class="grid c2">
+<div class="card"><h2>Add a holiday</h2>
+  <form method="post">{% csrf_token %}{% include "_form.html" %}
+    <button class="btn" type="submit">Save</button></form></div>
+<div class="card"><h2>Calendar</h2>
+  {% if holidays %}
+  <table><thead><tr><th>Date</th><th>Name</th><th>Teachers too</th><th></th></tr></thead>
+  <tbody>{% for h in holidays %}
+    <tr><td>{{ h.date|date:"j M Y" }}</td><td>{{ h.name }}</td>
+      <td>{% if h.applies_to_teachers %}Yes{% else %}No{% endif %}</td>
+      <td><a class="btn danger small" href="{% url 'academics:holiday_delete' h.pk %}">Remove</a></td></tr>
+  {% endfor %}</tbody></table>
+  {% else %}<div class="empty">No holidays set.</div>{% endif %}</div>
+</div>
+{% endblock %}

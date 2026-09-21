@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Recalculate{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Recalculate attendance</h1>
+<p>Raw punches are kept forever, so a timetable you fix today can be applied to yesterday's
+data.</p></div></div>
+
+<div class="grid c3" style="margin-bottom:16px;">
+  <div class="stat {% if pending %}warn{% endif %}"><div class="n">{{ pending }}</div>
+    <div class="k">Punches waiting to resolve</div></div>
+  <div class="stat {% if unmatched %}warn{% endif %}"><div class="n">{{ unmatched }}</div>
+    <div class="k">Punches with no matching person</div></div>
+</div>
+
+<div class="grid c3">
+<div class="card"><h3>Resolve pending punches</h3>
+  <p class="muted">Runs the engine over anything that arrived before its rules existed.</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="process_pending">
+    <button class="btn" type="submit">Resolve now</button></form></div>
+
+<div class="card"><h3>Close finished slots</h3>
+  <p class="muted">Marks absent anyone with no punch, for every slot whose window has already
+  closed on the chosen day.</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="close_slots">
+    <div class="form-row"><label>Date</label><input type="date" name="date" value="{{ today }}"></div>
+    <button class="btn" type="submit">Fill in absences</button></form></div>
+
+<div class="card"><h3>Rebuild a day</h3>
+  <p class="muted">Deletes the automatic records for that day and replays every punch. Records you
+  edited by hand are kept.</p>
+  <form method="post">{% csrf_token %}<input type="hidden" name="action" value="reprocess">
+    <div class="form-row"><label>Date</label><input type="date" name="date" value="{{ today }}"></div>
+    <button class="btn danger" type="submit">Rebuild</button></form></div>
+</div>
+
+<div class="card"><h3>Run these automatically</h3>
+<p class="muted">Add to crontab so absences appear without anyone clicking:</p>
+<pre>*/5 * * * * cd /srv/lps && venv/bin/python manage.py run_attendance
+*/5 * * * * cd /srv/lps && venv/bin/python manage.py send_scheduled_sms</pre></div>
+{% endblock %}

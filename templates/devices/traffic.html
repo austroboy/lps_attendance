@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Protocol log{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Protocol log</h1>
+  <p>Every request and response on the wire. Leave this on while you are commissioning the
+  devices, then turn it off in settings to save space.</p></div>
+  <a class="btn danger" href="{% url 'devices:traffic_clear' %}">Clear log</a>
+</div>
+<form class="filters" method="get">
+  <div class="form-row"><label>Device id</label><input type="text" name="dev_id" value="{{ dev_id }}"></div>
+  <button class="btn ghost" type="submit">Filter</button>
+</form>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>When</th><th>Direction</th><th>Device</th><th>Request</th><th class="num">Bytes</th><th>Body</th></tr></thead>
+  <tbody>{% for t in page %}
+    <tr><td class="muted">{{ t.created_at|date:"j M H:i:s" }}</td>
+      <td>{{ t.get_direction_display }}</td><td class="mono">{{ t.dev_id|default:"—" }}</td>
+      <td class="mono">{{ t.request_code|default:"—" }}</td><td class="num">{{ t.body_size }}</td>
+      <td><details><summary class="muted">show</summary>
+        <pre>{{ t.headers }}
+
+{{ t.body_preview }}
+
+hex: {{ t.hex_preview }}</pre></details></td></tr>
+  {% empty %}<tr><td colspan="6" class="empty">Nothing logged yet.</td></tr>{% endfor %}
+  </tbody></table></div>{% include "_pager.html" %}</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% for field in form %}
+  <div class="form-row">
+    {{ field.label_tag }}
+    {{ field }}
+    {% if field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
+    {% if field.errors %}<div class="errors">{{ field.errors|striptags }}</div>{% endif %}
+  </div>
+{% endfor %}
+{% if form.non_field_errors %}<div class="errors">{{ form.non_field_errors|striptags }}</div>{% endif %}

@@ -1,0 +1,13 @@
+{% if s.face_status == "DONE" %}
+  <button type="button" class="face-btn done js-face" data-action="reset"
+          title="Enrolled{% if s.face_detail %} — {{ s.face_detail }}{% endif %}{% if s.face_enrolled_at %} on {{ s.face_enrolled_at|date:'j M, H:i' }}{% endif %}. Click to clear and do it again."
+          aria-label="Face enrolled for {{ s.full_name }}">✓</button>
+{% elif s.face_status == "PENDING" %}
+  <button type="button" class="face-btn waiting js-face" data-action="cancel"
+          title="Waiting for {{ s.full_name }} at a terminal. Click to cancel."
+          aria-label="Waiting for face enrolment">⋯</button>
+{% else %}
+  <button type="button" class="face-btn none js-face" data-action="start"
+          title="No face on file. Click to start enrolment."
+          aria-label="Start face enrolment for {{ s.full_name }}">✗</button>
+{% endif %}

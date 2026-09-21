@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}SMS schedules{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>SMS schedules</h1>
+  <p>Each box is a send time. Drag classes into it and, at that time, every student in those
+  classes whose status matches gets one message. On a phone, tap to pick and tap a box to
+  place.</p></div>
+  <div class="btn-row">
+    <a class="btn ghost" href="{% url 'smsapp:templates' %}">Templates</a>
+    <a class="btn" href="{% url 'smsapp:schedule_new' %}">New schedule</a>
+  </div>
+</div>
+
+{% if not gateway_ready %}
+  <div class="notice warning">
+    The SSL Wireless credentials are not set, so nothing will actually send. Put
+    <span class="mono">SSLWIRELESS_API_TOKEN</span> and <span class="mono">SSLWIRELESS_SID</span>
+    in the environment, and ask SSL Wireless to whitelist this server's public IP.
+    Preview still works without them.
+  </div>
+{% endif %}
+{% if not has_templates %}
+  <div class="notice">A schedule needs a message template.
+    <a href="{% url 'smsapp:template_new' %}">Write one first</a>.</div>
+{% endif %}
+
+<div id="board-status" class="notice" hidden></div>
+
+<div id="board-hint" class="board-hint" hidden>
+  <span><strong data-hint-label></strong> selected — now tap a box to add it.</span>
+  <button type="button" id="board-hint-cancel" class="btn ghost small">Cancel</button>
+</div>
+
+{% if schedules %}
+<div class="board" data-board
+     data-assign-url="{% url 'smsapp:board_assign' %}"
+     data-assign-class-url="{% url 'smsapp:board_assign_class' %}"
+     data-csrf="{{ csrf_token }}">
+
+  <aside class="pool">
+    <h3>Classes</h3>
+    <span class="muted">Drag onto a schedule.</span>
+    {% for c in classes %}
+      {% if c.sections.exists %}
+        <span class="chip class-chip" draggable="true" data-kind="class"
+              data-id="{{ c.pk }}" data-label="{{ c.name }}">{{ c.name }} — whole class</span>
+        {% for s in c.sections.all %}
+          <span class="chip" draggable="true" data-kind="section" data-id="{{ s.pk }}"
+                data-label="{{ s }}" style="margin-left:12px;">{{ s.name }}</span>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    <h3 style="margin-top:14px;">Teachers</h3>
+    {% for t in teachers %}
+      <span class="chip" draggable="true" data-kind="teacher" data-id="{{ t.pk }}"
+            data-label="{{ t.full_name }}">{{ t.full_name }}</span>
+    {% endfor %}
+  </aside>
+
+  <div class="slots">
+    {% for s in schedules %}
+      <section class="slot" data-slot="{{ s.pk }}" data-name="{{ s.name }}"
+               style="border-top-color: {{ s.colour }};">
+        <div class="slot-head"><strong>{{ s.name }}</strong>
+          {% if not s.is_active %}<span class="badge bad">paused</span>{% endif %}</div>
+        <div class="times">Sends at {{ s.send_time|time:"H:i" }} · {{ s.get_audience_display }}</div>
+        <div class="meta">{{ s.status_label }} · {{ s.days_label }}
+          {% if s.time_slot %}· {{ s.time_slot.name }} only{% endif %}</div>
+        <div class="meta">Template: {{ s.template.name }}</div>
+        <div class="drop">
+          {% for link in s.sections.all %}
+            <span class="assigned" data-target="section:{{ link.section.pk }}">{{ link.section }}
+              <button type="button" title="Remove">&times;</button></span>
+          {% endfor %}
+          {% for link in s.teacher_targets.all %}
+            <span class="assigned" data-target="teacher:{{ link.teacher.pk }}">{{ link.teacher.full_name }}
+              <button type="button" title="Remove">&times;</button></span>
+          {% endfor %}
+        </div>
+        <div class="actions">
+          <a href="{% url 'smsapp:schedule_preview' s.pk %}">Preview</a>
+          <a href="{% url 'smsapp:schedule_edit' s.pk %}">Edit</a>
+          <a href="{% url 'smsapp:schedule_delete' s.pk %}"
+             onclick="return confirm('Delete “{{ s.name }}”?')">Delete</a>
+        </div>
+      </section>
+    {% endfor %}
+  </div>
+</div>
+{% else %}
+<div class="card empty"><p>No SMS schedules yet.</p>
+  <p class="muted">A typical one: “Absent alert”, sends 09:30, statuses Absent, template
+  “Absent notice”, with every class dropped in.</p>
+  <a class="btn" href="{% url 'smsapp:schedule_new' %}">Create one</a></div>
+{% endif %}
+
+<div class="card" style="margin-top:18px;">
+  <h3>Before it sends for real</h3>
+  <p class="muted">Use Preview on a schedule to see the exact recipients and message text for a
+  chosen day. Nothing is sent and no credit is spent. Each schedule can only run once per day —
+  a repeated cron run will not double-message anyone.</p>
+</div>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/board.js' %}"></script>{% endblock %}
