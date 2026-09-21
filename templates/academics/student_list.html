@@ -69,12 +69,12 @@
 
 <div class="card">
 {% if page %}
-<div class="table-wrap"><table class="sticky-head roster"
+<div class="table-wrap sticky-wrap"><table class="sticky-head roster"
      data-roster
      data-states-url="{% url 'academics:student_states' %}"
      data-csrf="{{ csrf_token }}">
   <thead><tr>
-    <th class="num">Roll</th><th>Name</th><th>Class</th>
+    <th>Roll</th><th>Name</th><th>Class</th>
     <th>Device id</th><th>RFID</th><th>Face</th><th>On roll</th><th></th>
   </tr></thead>
   <tbody>{% for s in page %}
@@ -84,10 +84,10 @@
         data-face-url="{% url 'academics:student_face' s.pk %}"
         data-active-url="{% url 'academics:student_set_active' s.pk %}"
         class="{% if not s.is_active %}is-off{% endif %}">
-      <td class="num">{{ s.roll_no|default:"—" }}</td>
+      <td class="mono roll">{{ s.roll_no|default:"—" }}</td>
       <td>
         <a href="{% url 'academics:student_edit' s.pk %}">{{ s.full_name }}</a>
-        <div class="muted mono">{{ s.admission_no }}</div>
+        {% if s.admission_no != s.roll_no %}<div class="muted mono">{{ s.admission_no }}</div>{% endif %}
       </td>
       <td>{{ s.section.school_class.name }} · {{ s.section.name }}
         {% if s.section.shift %}<div class="muted">{{ s.section.shift.name }}{% if s.section.version %} · {{ s.section.version.name }}{% endif %}</div>{% endif %}

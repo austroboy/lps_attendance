@@ -366,7 +366,8 @@ def run_job(job: ImportJob, progress_every=CHUNK):
         parsed.append({
             "admission_no": admission,
             "full_name": name,
-            "roll_no": _clean(raw.get("roll_no")),
+            # Blank roll means "same as the admission number" at this school.
+            "roll_no": _clean(raw.get("roll_no")) or admission,
             "section": section,
             "guardian_name": _clean(raw.get("guardian_name")),
             "guardian_phone": _clean_phone(raw.get("guardian_phone")),

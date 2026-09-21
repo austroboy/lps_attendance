@@ -590,3 +590,40 @@ class RosterTests(TestCase):
             f"/academics/students/states/?ids={self.student.pk},{self.outsider.pk}")
         returned = [row["id"] for row in response.json()["students"]]
         self.assertEqual(returned, [self.student.pk])
+
+
+class RollNumberTests(TestCase):
+    """At this school the admission ID is the roll number."""
+
+    def setUp(self):
+        six = SchoolClass.objects.create(name="Class Six", order=8)
+        self.section = Section.objects.create(school_class=six, name="A")
+
+    def test_blank_roll_takes_the_admission_number(self):
+        student = Student.objects.create(admission_no="LPS-JS-260044", full_name="Ahnaf",
+                                         section=self.section)
+        self.assertEqual(student.roll_no, "LPS-JS-260044")
+
+    def test_a_typed_roll_is_kept_whatever_its_shape(self):
+        for roll in ("12", "A-07", "LPS BM 250927", "রোল-৫"):
+            student = Student.objects.create(admission_no=f"X{roll}", full_name="S",
+                                             section=self.section, roll_no=roll)
+            student.refresh_from_db()
+            self.assertEqual(student.roll_no, roll)
+
+    def test_import_fills_a_blank_roll_too(self):
+        # bulk_create skips save(), so the importer has to do it itself.
+        run(workbook_bytes([student_row(1, roll_no=""), student_row(2, roll_no="R-2")]))
+        self.assertEqual(Student.objects.get(admission_no="A0001").roll_no, "A0001")
+        self.assertEqual(Student.objects.get(admission_no="A0002").roll_no, "R-2")
+
+    def test_roster_does_not_repeat_the_id_under_the_name(self):
+        from accounts.models import Role, User
+
+        admin = User.objects.create(username="boss", role=Role.SUPERADMIN,
+                                    is_staff=True, is_superuser=True)
+        Student.objects.create(admission_no="LPS-JS-260044", full_name="Ahnaf",
+                               section=self.section)
+        self.client.force_login(admin)
+        html = self.client.get("/academics/students/").content.decode()
+        self.assertEqual(html.count("LPS-JS-260044"), 1)

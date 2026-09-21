@@ -160,7 +160,9 @@ class Student(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
                                 related_name="student", null=True, blank=True)
     admission_no = models.CharField(max_length=30, unique=True)
-    roll_no = models.CharField(max_length=20, blank=True)
+    roll_no = models.CharField(
+        max_length=40, blank=True,
+        help_text="Any text — digits, letters, dashes. Left blank, the admission number is used.")
     full_name = models.CharField(max_length=120)
     section = models.ForeignKey(Section, on_delete=models.PROTECT, related_name="students")
     guardian_name = models.CharField(max_length=120, blank=True)
@@ -204,6 +206,14 @@ class Student(models.Model):
     @property
     def school_class(self):
         return self.section.school_class
+
+    def save(self, *args, **kwargs):
+        # At this school the admission ID is the roll number. Filling it here
+        # covers the add form, the edit form and the admin; the bulk importer
+        # bypasses save() and does the same thing itself.
+        if not (self.roll_no or "").strip():
+            self.roll_no = self.admission_no
+        super().save(*args, **kwargs)
 
     @property
     def sms_number(self):

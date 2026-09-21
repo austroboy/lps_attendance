@@ -19,7 +19,7 @@ from .models import Group, SchoolClass, Section, Shift, Student, Version
 
 HEADERS = [
     ("admission_no", 16, "Required. Unique. Re-uploading the same number updates that student."),
-    ("roll_no", 9, "Optional."),
+    ("roll_no", 16, "Optional. Letters, digits, anything. Blank means the admission number is used."),
     ("full_name", 26, "Required."),
     ("class", 16, "Required. Created if it does not exist."),
     ("section", 11, "Required. Created if it does not exist."),

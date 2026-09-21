@@ -15,6 +15,7 @@ VENV=/home/lps/venv
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
 ok()   { printf '    \033[32m✓\033[0m %s\n' "$*"; }
+warn() { printf '    \033[33m!\033[0m %s\n' "$*"; }
 die()  { printf '\n\033[1;31mSTOPPED: %s\033[0m\n' "$*" >&2; exit 1; }
 as_app() { sudo -u "$APP_USER" -H bash -c "cd '$APP_DIR' && $*"; }
 
@@ -57,15 +58,25 @@ if ! as_app "timeout 20 $VENV/bin/python -c 'from config.celery import app; app.
     as_app "timeout 20 $VENV/bin/python -c 'from config.celery import app; app.connection().ensure_connection(max_retries=1)'" 2>&1 | tail -3
     die "the app cannot reach Redis — imports would never leave PENDING"
 fi
+# Send a real task and wait for its answer: broker in, worker runs it, result
+# back. (celery inspect ping uses a separate remote-control channel and can
+# stay silent while tasks run fine, so it proves nothing either way.)
+# A dead worker does not stop the site — imports fall back to "Run it now" —
+# so this warns rather than aborting a deploy that is otherwise good.
 WORKER_OK=no
-for _ in 1 2 3 4 5 6; do
-    if as_app "timeout 15 $VENV/bin/celery -A config inspect ping -t 5" 2>/dev/null | grep -q pong; then
+for _ in 1 2 3; do
+    if as_app "timeout 45 $VENV/bin/python -c 'from config.celery import debug_task; debug_task.delay().get(timeout=30)'" >/dev/null 2>&1; then
         WORKER_OK=yes; break
     fi
     sleep 5
 done
-[ "$WORKER_OK" = yes ] || { journalctl -u lps-celery -n 20 --no-pager; die "the import worker is running but not answering"; }
-ok "lps and lps-celery running · worker answering through Redis"
+if [ "$WORKER_OK" = yes ]; then
+    ok "import worker took a task and answered"
+else
+    warn "import worker did not answer a test task — imports will wait until you press Run it now"
+    warn "  see why: journalctl -u lps-celery -n 40 --no-pager"
+fi
+ok "lps and lps-celery running"
 
 say "5. Health"
 SITE=$(grep -E '^CSRF_TRUSTED_ORIGINS=' "$APP_DIR/.env" | cut -d= -f2 | cut -d, -f1)
