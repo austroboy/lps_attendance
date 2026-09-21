@@ -50,7 +50,22 @@ systemctl restart lps lps-celery
 sleep 4
 systemctl is-active --quiet lps || { journalctl -u lps -n 40 --no-pager; die "lps did not come back"; }
 systemctl is-active --quiet lps-celery || { journalctl -u lps-celery -n 40 --no-pager; die "lps-celery did not come back"; }
-ok "lps and lps-celery running"
+# "active" only means the process exists. A worker that cannot reach Redis
+# sits in a retry loop and still reports active, which is exactly how a broken
+# broker went unnoticed once. Ask the broker, and ask the worker, directly.
+if ! as_app "timeout 20 $VENV/bin/python -c 'from config.celery import app; app.connection().ensure_connection(max_retries=2); print(\"broker ok\")'" >/dev/null 2>&1; then
+    as_app "timeout 20 $VENV/bin/python -c 'from config.celery import app; app.connection().ensure_connection(max_retries=1)'" 2>&1 | tail -3
+    die "the app cannot reach Redis — imports would never leave PENDING"
+fi
+WORKER_OK=no
+for _ in 1 2 3 4 5 6; do
+    if as_app "timeout 15 $VENV/bin/celery -A config inspect ping -t 5" 2>/dev/null | grep -q pong; then
+        WORKER_OK=yes; break
+    fi
+    sleep 5
+done
+[ "$WORKER_OK" = yes ] || { journalctl -u lps-celery -n 20 --no-pager; die "the import worker is running but not answering"; }
+ok "lps and lps-celery running · worker answering through Redis"
 
 say "5. Health"
 SITE=$(grep -E '^CSRF_TRUSTED_ORIGINS=' "$APP_DIR/.env" | cut -d= -f2 | cut -d, -f1)
