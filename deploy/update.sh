@@ -53,8 +53,8 @@ systemctl is-active --quiet lps-celery || { journalctl -u lps-celery -n 40 --no-
 ok "lps and lps-celery running"
 
 say "5. Health"
-DOMAIN=$(grep -E '^DJANGO_ALLOWED_HOSTS=' "$APP_DIR/.env" | cut -d= -f2 | cut -d, -f1)
+SITE=$(grep -E '^CSRF_TRUSTED_ORIGINS=' "$APP_DIR/.env" | cut -d= -f2 | cut -d, -f1)
 curl -s -o /dev/null -w "    dreamspotglobal.com  %{http_code}\n" https://dreamspotglobal.com/ || true
-curl -s -o /dev/null -w "    $DOMAIN  %{http_code}\n" "https://$DOMAIN/" || true
+curl -s -o /dev/null -w "    $SITE/login/  %{http_code}\n" "$SITE/login/" || true
 printf "    device port: "; curl -s --max-time 10 http://127.0.0.1:8008/ebkn/ | head -1
 free -m | awk '/Mem:/ {printf "    memory: %s MB available\n", $7}'

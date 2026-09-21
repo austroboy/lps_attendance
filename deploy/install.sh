@@ -5,7 +5,14 @@
 #
 #  Run as root, after the code is cloned to /home/lps/app:
 #
-#      bash /home/lps/app/deploy/install.sh <domain> <email>
+#      bash /home/lps/app/deploy/install.sh                  # no domain yet
+#      bash /home/lps/app/deploy/install.sh <domain> <email> # once you have one
+#
+#  Without a domain the site is served at http://<server-ip>:8009. Port 80 is
+#  Dream Spot's default server, so the bare IP on port 80 would land there.
+#  When a domain arrives, run it again with the domain and then
+#  enable-https.sh; the 8009 listener is removed so log-ins are never plain
+#  HTTP once HTTPS exists.
 #
 #  Safe to run more than once. It never overwrites an existing .env or database
 #  password, and it never touches anything named dreamspot*.
@@ -28,8 +35,8 @@
 # =============================================================================
 set -euo pipefail
 
-DOMAIN="${1:?usage: install.sh <domain> <email>}"
-EMAIL="${2:?usage: install.sh <domain> <email>}"
+DOMAIN="${1:-}"
+EMAIL="${2:-}"
 
 APP_USER=lps
 HOME_DIR=/home/lps
@@ -43,20 +50,33 @@ DB_URL_FILE=/root/lps_db_url.txt
 PSQL=/usr/pgsql-16/bin/psql
 PY=python3.12
 DEVICE_PORT=8008
+UI_PORT=8009
 SERVER_IP="${SERVER_IP:-103.29.180.40}"
 ACME_ROOT=/var/www/lps-acme
 NGINX_CONF=/etc/nginx/conf.d/lps.conf
 
-# One label for both the apex and www only when the domain is an apex.
-# attendance.example.com should not grow a www.attendance.example.com.
-if [ "$(tr -cd '.' <<<"$DOMAIN" | wc -c)" -eq 1 ]; then
-    SERVER_NAMES="$DOMAIN www.$DOMAIN"
-    HOSTS="$DOMAIN,www.$DOMAIN"
-    ORIGINS="https://$DOMAIN,https://www.$DOMAIN"
+if [ -z "$DOMAIN" ]; then
+    MODE=ip
+    SERVER_NAMES="_"
+    HOSTS="$SERVER_IP"
+    ORIGINS="http://$SERVER_IP:$UI_PORT"
+    COOKIE_SECURE=False          # plain HTTP: a Secure cookie would never be sent back
+    SITE_URL="http://$SERVER_IP:$UI_PORT"
 else
-    SERVER_NAMES="$DOMAIN"
-    HOSTS="$DOMAIN"
-    ORIGINS="https://$DOMAIN"
+    MODE=domain
+    # One label for both the apex and www only when the domain is an apex.
+    # attendance.example.com should not grow a www.attendance.example.com.
+    if [ "$(tr -cd '.' <<<"$DOMAIN" | wc -c)" -eq 1 ]; then
+        SERVER_NAMES="$DOMAIN www.$DOMAIN"
+        HOSTS="$DOMAIN,www.$DOMAIN"
+        ORIGINS="https://$DOMAIN,https://www.$DOMAIN"
+    else
+        SERVER_NAMES="$DOMAIN"
+        HOSTS="$DOMAIN"
+        ORIGINS="https://$DOMAIN"
+    fi
+    COOKIE_SECURE=True
+    SITE_URL="https://$DOMAIN"
 fi
 
 say()  { printf '\n\033[1;36m==> %s\033[0m\n' "$*"; }
@@ -76,15 +96,17 @@ command -v "$PY" >/dev/null || die "$PY not found"
 systemctl is-active --quiet nginx || die "nginx is not running"
 systemctl is-active --quiet postgresql-16 || die "postgresql-16 is not running"
 
-if ss -tlnp | grep -q ":$DEVICE_PORT "; then
-    if ! grep -qs "listen $DEVICE_PORT" "$NGINX_CONF"; then
-        die "port $DEVICE_PORT is already in use by something else"
+for port in "$DEVICE_PORT" "$UI_PORT"; do
+    if ss -tlnp | grep -q ":$port "; then
+        if ! grep -qs "listen $port" "$NGINX_CONF"; then
+            die "port $port is already in use by something else"
+        fi
     fi
-fi
+done
 
 DREAMSPOT_BEFORE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 https://dreamspotglobal.com/ || echo 000)
 ok "Dream Spot answers $DREAMSPOT_BEFORE before we start"
-ok "domain: $DOMAIN · device port: $DEVICE_PORT · server ip: $SERVER_IP"
+ok "mode: $MODE · site: $SITE_URL · device port: $DEVICE_PORT"
 
 # -----------------------------------------------------------------------------
 say "1. Swap (the handoff asks for it before project #2)"
@@ -160,8 +182,15 @@ fi
 say "5. Environment file"
 # -----------------------------------------------------------------------------
 ENV_FILE=$APP_DIR/.env
+set_env() {   # replace KEY=... or append it; values here never contain '|'
+    if grep -q "^$1=" "$ENV_FILE"; then
+        sed -i "s|^$1=.*|$1=$2|" "$ENV_FILE"
+    else
+        echo "$1=$2" >> "$ENV_FILE"
+    fi
+}
 if [ -f "$ENV_FILE" ]; then
-    ok "$ENV_FILE exists — left as it is"
+    ok "$ENV_FILE exists — secrets kept"
 else
     umask 077
     cat > "$ENV_FILE" <<EOF
@@ -189,6 +218,12 @@ EOF
     chmod 600 "$ENV_FILE"
     ok ".env written (mode 600)"
 fi
+# These follow the mode, so moving from IP to a domain later is one re-run.
+set_env DJANGO_ALLOWED_HOSTS "$HOSTS,$SERVER_IP,127.0.0.1,localhost"
+set_env CSRF_TRUSTED_ORIGINS "$ORIGINS"
+set_env SESSION_COOKIE_SECURE "$COOKIE_SECURE"
+set_env CSRF_COOKIE_SECURE "$COOKIE_SECURE"
+ok "hosts and cookies set for $MODE mode"
 
 # -----------------------------------------------------------------------------
 say "6. Migrate, collect static, sanity check"
@@ -281,7 +316,7 @@ mkdir -p "$ACME_ROOT"
 restorecon -R "$ACME_ROOT" 2>/dev/null || true
 
 HAVE_CERT=no
-[ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ] && HAVE_CERT=yes
+[ -n "$DOMAIN" ] && [ -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" ] && HAVE_CERT=yes
 
 render_nginx() {
 cat <<'NGINX'
@@ -317,7 +352,30 @@ server {
 }
 NGINX
 
-if [ "$HAVE_CERT" = yes ]; then
+if [ "$MODE" = ip ]; then
+cat <<'NGINX'
+
+# ---------------------------------------------------------------------------
+# People, no domain yet. Its own port, because Dream Spot is the default
+# server on 80 and would answer the bare IP. Plain HTTP until a domain exists;
+# port 80 is not touched at all in this mode.
+# ---------------------------------------------------------------------------
+server {
+    listen __UI_PORT__;
+    server_name _;
+    client_max_body_size 20M;
+    access_log /var/log/nginx/lps.access.log;
+    error_log  /var/log/nginx/lps.error.log;
+
+    location /media/ { return 404; }
+    location / {
+        proxy_pass http://unix:__SOCK__;
+        include /etc/nginx/lps_proxy_params;
+        proxy_read_timeout 120s;
+    }
+}
+NGINX
+elif [ "$HAVE_CERT" = yes ]; then
 cat <<'NGINX'
 
 # ---------------------------------------------------------------------------
@@ -400,6 +458,7 @@ fi
 TMP_CONF=$(mktemp)
 render_nginx \
   | sed -e "s|__DEVICE_PORT__|$DEVICE_PORT|g" \
+        -e "s|__UI_PORT__|$UI_PORT|g" \
         -e "s|__SOCK__|$SOCK|g" \
         -e "s|__SERVER_NAMES__|$SERVER_NAMES|g" \
         -e "s|__DOMAIN__|$DOMAIN|g" \
@@ -426,12 +485,16 @@ systemctl reload nginx
 [ -n "$BACKUP_CONF" ] && rm -f "$BACKUP_CONF"
 sleep 2
 
-if ! ss -tlnp | grep -q ":$DEVICE_PORT "; then
-    warn "nginx is not listening on $DEVICE_PORT. If SELinux blocked it:"
-    warn "  semanage port -a -t http_port_t -p tcp $DEVICE_PORT && systemctl reload nginx"
-    die "device port not open"
-fi
-ok "nginx reloaded · devices on :$DEVICE_PORT · site on :80$( [ "$HAVE_CERT" = yes ] && echo ' + :443')"
+PORTS="$DEVICE_PORT"
+[ "$MODE" = ip ] && PORTS="$PORTS $UI_PORT"
+for port in $PORTS; do
+    if ! ss -tlnp | grep -q ":$port "; then
+        warn "nginx is not listening on $port. If SELinux blocked it:"
+        warn "  semanage port -a -t http_port_t -p tcp $port && systemctl reload nginx"
+        die "port $port not open"
+    fi
+done
+ok "nginx reloaded · devices :$DEVICE_PORT · site $SITE_URL"
 
 # -----------------------------------------------------------------------------
 say "9. Scheduled jobs and backups"
@@ -482,15 +545,22 @@ if [ "$DREAMSPOT_AFTER" != "$DREAMSPOT_BEFORE" ]; then
 else
     ok "Dream Spot still answers $DREAMSPOT_AFTER"
 fi
-LPS_LOCAL=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $DOMAIN" http://127.0.0.1/ || echo 000)
-ok "LPS via nginx on :80 → $LPS_LOCAL ($( [ "$HAVE_CERT" = yes ] && echo '301 to HTTPS expected' || echo '302 to login expected'))"
+if [ "$MODE" = ip ]; then
+    LPS_LOCAL=$(curl -s -o /dev/null -w "%{http_code}" "http://127.0.0.1:$UI_PORT/login/" || echo 000)
+    ok "LPS login page on :$UI_PORT → $LPS_LOCAL (200 expected)"
+else
+    LPS_LOCAL=$(curl -s -o /dev/null -w "%{http_code}" -H "Host: $DOMAIN" http://127.0.0.1/ || echo 000)
+    ok "LPS via nginx on :80 → $LPS_LOCAL ($( [ "$HAVE_CERT" = yes ] && echo '301 to HTTPS expected' || echo '302 to login expected'))"
+fi
 DEV=$(curl -s --max-time 10 "http://127.0.0.1:$DEVICE_PORT/ebkn/" | head -1)
 ok "device port says: $DEV"
 systemctl is-active nginx postgresql-16 redis dreamspot lps lps-celery crond | paste -sd' ' | sed 's/^/    services: /'
 free -m | awk '/Mem:/ {printf "    memory: %s MB used of %s MB, %s MB available\n", $3, $2, $7}'
 
 say "Done"
-if [ "$HAVE_CERT" = yes ]; then
+if [ "$MODE" = ip ]; then
+    echo "    Site: $SITE_URL"
+elif [ "$HAVE_CERT" = yes ]; then
     echo "    https://$DOMAIN is live."
 else
     echo "    Next: point DNS for $DOMAIN at $SERVER_IP, then run"
