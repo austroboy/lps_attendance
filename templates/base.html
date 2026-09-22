@@ -76,8 +76,6 @@
       <a href="{% url 'reports:mine' %}" class="{% if vn == 'reports:mine' %}on{% endif %}">My attendance</a>
     {% endif %}
 
-    <div class="group">Account</div>
-    <a href="{% url 'accounts:change_password' %}" class="{% if vn == 'accounts:change_password' %}on{% endif %}">Change password</a>
     {% endwith %}
   </nav>
 
@@ -97,10 +95,13 @@
         Signed in as <strong>{{ user.get_full_name|default:user.username }}</strong>
         — {{ user.get_role_display }}
       </div>
-      <form method="post" action="{% url 'accounts:logout' %}" style="margin-left:auto;">
-        {% csrf_token %}
-        <button class="btn ghost small" type="submit">Sign out</button>
-      </form>
+      <div class="topbar-actions">
+        <a class="btn ghost small" href="{% url 'accounts:change_password' %}"><span class="wide-only">Change p</span><span class="narrow-only">P</span>assword</a>
+        <form method="post" action="{% url 'accounts:logout' %}">
+          {% csrf_token %}
+          <button class="btn ghost small" type="submit">Sign out</button>
+        </form>
+      </div>
     </header>
 
     <main class="content">

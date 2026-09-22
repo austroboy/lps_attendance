@@ -732,3 +732,146 @@ details summary { cursor: pointer; }
   flex: 0 0 auto;
 }
 .sidebar .brand strong { line-height: 1.2; }
+
+/* =========================================================================
+   Record forms — student and teacher
+   =========================================================================
+   One sheet, divided into labelled parts, so a long record reads in the
+   order you think about a person: who they are, where they sit, who to call,
+   how the terminal knows them.
+   ========================================================================= */
+.sheet {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  max-width: 860px;
+}
+.sheet-part {
+  display: grid;
+  grid-template-columns: 190px 1fr;
+  gap: 8px 28px;
+  padding: 22px 24px;
+  border-bottom: 1px solid var(--line);
+}
+.sheet-part > h2 {
+  font-size: .95rem;
+  font-weight: 600;
+  margin: 6px 0 0;
+  color: var(--ink);
+}
+.sheet-part > .muted,
+.sheet-part > .ff-static,
+.sheet-part > .access-list,
+.sheet-part > datalist { grid-column: 2; }
+.sheet-part > .muted { margin: 0 0 6px; }
+.ff-grid {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 18px;
+  align-content: start;
+}
+.ff { min-width: 0; }
+.ff-wide { grid-column: 1 / -1; }
+.ff > label, .ff-label {
+  display: block;
+  font-size: .84rem;
+  font-weight: 600;
+  margin-bottom: 5px;
+  color: var(--ink);
+}
+.ff .req { color: var(--absent); font-weight: 400; }
+.ff .field, .ff select, .ff input[type=text], .ff input[type=date], .ff input[type=file] {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 5px;
+}
+.ff .field:focus { outline: none; border-color: var(--deep); box-shadow: 0 0 0 3px rgba(18, 69, 79, .14); }
+.ff .help { font-size: .79rem; color: var(--ink-soft); margin-top: 4px; }
+.ff.ff-error .field { border-color: var(--absent); }
+.ff-check {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: 400 !important;
+  font-size: .9rem;
+  cursor: pointer;
+  margin: 0;
+}
+.ff-check input { margin: 3px 0 0; width: 16px; height: 16px; flex: 0 0 auto; }
+.ff-static { margin: 6px 0 0; font-size: .9rem; }
+.leave-fields[hidden] { display: none; }
+.leave-fields { padding: 14px; background: #fbf6f0; border-radius: 6px; }
+
+.photo-row { grid-column: 2; display: flex; gap: 16px; align-items: center; }
+.photo-thumb {
+  width: 64px; height: 64px; border-radius: 8px; object-fit: cover;
+  background: #eef3f3; flex: 0 0 auto;
+}
+.photo-empty {
+  display: grid; place-items: center; font-size: 1.5rem; font-weight: 600; color: var(--ink-soft);
+}
+.photo-row .ff { flex: 1; }
+
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+  padding: 18px 24px;
+  background: #f8faf9;
+  border-radius: 0 0 6px 6px;
+  position: sticky;
+  bottom: 0;
+}
+
+/* ---- class access picker ---- */
+.access-list { display: grid; gap: 6px; }
+.access-class { border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.access-class summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 9px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.access-class summary::-webkit-details-marker { display: none; }
+.access-class summary::before {
+  content: "";
+  width: 7px; height: 7px;
+  border-right: 2px solid var(--ink-soft);
+  border-bottom: 2px solid var(--ink-soft);
+  transform: rotate(-45deg);
+  margin-right: 12px;
+  transition: transform .15s;
+}
+.access-class[open] summary::before { transform: rotate(45deg); }
+.access-name { font-weight: 600; flex: 1; }
+.access-count { font-size: .82rem; color: var(--ink-soft); }
+.access-class[open] .access-count { color: var(--deep); }
+.access-body { padding: 4px 12px 12px 31px; border-top: 1px solid var(--line); }
+.access-whole { margin: 10px 0 8px; font-weight: 600 !important; }
+.access-sections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 6px 14px;
+}
+
+@media (max-width: 760px) {
+  .sheet-part { grid-template-columns: 1fr; padding: 18px 16px; gap: 10px; }
+  .sheet-part > .muted, .sheet-part > .ff-static, .sheet-part > .access-list,
+  .ff-grid, .photo-row { grid-column: 1; }
+  .ff-grid { grid-template-columns: 1fr; }
+  .sheet-actions { padding: 14px 16px; }
+  .sheet-actions .btn { flex: 1; text-align: center; }
+}
+
+/* ---- topbar account links ---- */
+.topbar-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.topbar-actions .btn { white-space: nowrap; }
+.narrow-only { display: none; }
+@media (max-width: 560px) {
+  .wide-only { display: none; }
+  .narrow-only { display: inline; }
+  .topbar-actions { gap: 6px; }
+}
+.topbar-actions form { margin: 0; }

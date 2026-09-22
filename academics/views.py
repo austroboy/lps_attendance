@@ -211,7 +211,9 @@ def student_list(request):
     return render(request, "academics/student_list.html", {
         "page": paginate(request, queryset),
         "sections": sections,
-        "classes": SchoolClass.objects.all(),
+        "classes": (SchoolClass.objects.all() if allowed is None else
+                    SchoolClass.objects.filter(sections__id__in=allowed).distinct()),
+        "can_add": allowed is None or bool(allowed),
         "shifts": Shift.objects.all(),
         "versions": Version.objects.all(),
         "groups": Group.objects.all(),
@@ -233,20 +235,26 @@ def student_list(request):
 
 @staff_required
 def student_form(request, pk=None):
-    instance = get_object_or_404(Student, pk=pk) if pk else None
-    if instance and not request.user.is_admin_level:
-        allowed = request.user.allowed_section_ids() or []
-        if instance.section_id not in allowed:
+    instance = get_object_or_404(Student.objects.select_related("user"), pk=pk) if pk else None
+    allowed = request.user.allowed_section_ids()
+    if allowed is not None:
+        if instance and instance.section_id not in allowed:
             messages.error(request, "That student is not in one of your classes.")
             return redirect("academics:student_list")
-    form = StudentForm(request.POST or None, request.FILES or None, instance=instance)
+        if not allowed:
+            return render(request, "academics/student_form.html", {
+                "no_access": True, "title": "Add student" if not instance else "Edit student"})
+
+    form = StudentForm(request.POST or None, request.FILES or None,
+                       instance=instance, user=request.user)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Student saved.")
+        student = form.save()
+        messages.success(request, f"{student.full_name} saved.")
         return redirect("academics:student_list")
-    return render(request, "academics/simple_form.html",
-                  {"form": form, "title": "Edit student" if instance else "Add student",
-                   "back": "academics:student_list"})
+    return render(request, "academics/student_form.html", {
+        "form": form, "student": instance,
+        "title": "Edit student" if instance else "Add student",
+    })
 
 
 # ------------------------------------------------- roster quick actions ---
@@ -619,15 +627,16 @@ def teacher_import_sample(request):
 
 @admin_required
 def teacher_form(request, pk=None):
-    instance = get_object_or_404(Teacher, pk=pk) if pk else None
+    instance = get_object_or_404(Teacher.objects.select_related("user"), pk=pk) if pk else None
     form = TeacherForm(request.POST or None, instance=instance)
     if request.method == "POST" and form.is_valid():
-        form.save()
-        messages.success(request, "Teacher saved.")
+        teacher = form.save()
+        messages.success(request, f"{teacher.full_name} saved.")
         return redirect("academics:teacher_list")
-    return render(request, "academics/simple_form.html",
-                  {"form": form, "title": "Edit teacher" if instance else "Add teacher",
-                   "back": "academics:teacher_list"})
+    return render(request, "academics/teacher_form.html", {
+        "form": form, "teacher": instance,
+        "title": "Edit teacher" if instance else "Add teacher",
+    })
 
 
 @admin_required

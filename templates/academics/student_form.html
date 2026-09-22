@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>{% if student %}{{ student.full_name }}{% else %}Add student{% endif %}</h1>
+    {% if student %}<p>{{ student.section }} · {{ student.roll_no }}</p>{% endif %}
+  </div>
+  <a class="btn ghost" href="{% url 'academics:student_list' %}">Back to students</a>
+</div>
+
+{% if no_access %}
+  <div class="card empty">
+    <p>No classes are assigned to you yet, so there is nowhere to add a student.</p>
+    <p class="muted">Ask the office to give you access to your class from the teacher's page.</p>
+  </div>
+{% else %}
+<form method="post" enctype="multipart/form-data" class="sheet" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="notice error">{{ form.non_field_errors|striptags }}</div>{% endif %}
+
+  <section class="sheet-part">
+    <h2>Student</h2>
+    <div class="ff-grid">
+      {% include "_field.html" with field=form.full_name wide=True %}
+      {% include "_field.html" with field=form.admission_no %}
+      {% include "_field.html" with field=form.roll_no %}
+    </div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Class</h2>
+    <div class="ff-grid">
+      {% include "_field.html" with field=form.section wide=True %}
+    </div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Guardian</h2>
+    <div class="ff-grid">
+      {% include "_field.html" with field=form.guardian_name wide=True %}
+      {% include "_field.html" with field=form.guardian_phone %}
+      {% include "_field.html" with field=form.student_phone %}
+    </div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Attendance terminal</h2>
+    <div class="ff-grid">
+      {% include "_field.html" with field=form.rfid_number %}
+      {% include "_field.html" with field=form.device_user_id %}
+      {% if student %}
+        <div class="ff ff-wide">
+          <span class="ff-label">Face</span>
+          <p class="ff-static">
+            {% if student.face_status == "DONE" %}<span class="badge ok">Enrolled</span>
+              {% if student.face_enrolled_at %}<span class="muted">{{ student.face_enrolled_at|date:"j M Y" }}</span>{% endif %}
+            {% elif student.face_status == "PENDING" %}<span class="badge LATE">Waiting at a terminal</span>
+            {% else %}<span class="badge bad">Not enrolled</span>
+              <span class="muted">Enrol from the face button on the Students page.</span>{% endif %}
+          </p>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Photo</h2>
+    <div class="photo-row">
+      {% if student.photo %}<img class="photo-thumb" src="{{ student.photo.url }}" alt="{{ student.full_name }}">{% else %}<div class="photo-thumb photo-empty" aria-hidden="true">{{ student.full_name|default:"?"|slice:":1" }}</div>{% endif %}
+      {% include "_field.html" with field=form.photo %}
+    </div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Status</h2>
+    <div class="ff-grid">
+      {% include "_field.html" with field=form.is_active wide=True %}
+      <div class="leave-fields ff-wide ff-grid" data-when-inactive>
+        {% include "_field.html" with field=form.leave_reason %}
+        {% include "_field.html" with field=form.leave_note %}
+      </div>
+    </div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Login</h2>
+    {% if form.has_login %}
+      <p class="ff-static">Signs in as <span class="mono">{{ student.user.username }}</span>.</p>
+    {% else %}
+      <div class="ff-grid">{% include "_field.html" with field=form.create_login wide=True %}</div>
+    {% endif %}
+  </section>
+
+  <div class="sheet-actions">
+    <button class="btn" type="submit">{% if student %}Save changes{% else %}Add student{% endif %}</button>
+    <a class="btn ghost" href="{% url 'academics:student_list' %}">Cancel</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* Reason for leaving only matters once "On the roll" is unticked. */
+(function () {
+  const box = document.getElementById("id_is_active");
+  const extra = document.querySelector("[data-when-inactive]");
+  if (!box || !extra) return;
+  const sync = () => { extra.hidden = box.checked; };
+  box.addEventListener("change", sync); sync();
+})();
+</script>
+{% endblock %}

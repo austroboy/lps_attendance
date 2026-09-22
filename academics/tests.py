@@ -744,3 +744,92 @@ class BrandingTests(TestCase):
         self.client.force_login(admin)
         html = self.client.get("/").content.decode()
         self.assertNotIn("Face terminals, timetables, SMS", html)
+
+
+class FormAccessTests(TestCase):
+    """A teacher can only ever put students into their own sections."""
+
+    def setUp(self):
+        from accounts.models import Role, User
+        six = SchoolClass.objects.create(name="Six", order=8)
+        two = SchoolClass.objects.create(name="Two", order=4)
+        self.mine = Section.objects.create(school_class=six, name="A")
+        self.other = Section.objects.create(school_class=two, name="Meghna")
+        self.teacher_user = User.objects.create(username="T-9", role=Role.TEACHER)
+        self.teacher = Teacher.objects.create(employee_code="T-9", full_name="Naeem",
+                                              user=self.teacher_user)
+        ClassAccess.objects.create(teacher=self.teacher, school_class=six, section=self.mine)
+        self.admin = User.objects.create(username="boss", role=Role.SUPERADMIN,
+                                         is_staff=True, is_superuser=True)
+
+    def post_student(self, section):
+        return self.client.post("/academics/students/new/", {
+            "full_name": "New Kid", "admission_no": "N-1", "roll_no": "",
+            "section": section.pk, "guardian_name": "", "guardian_phone": "",
+            "student_phone": "", "device_user_id": "", "rfid_number": "",
+            "is_active": "on", "leave_reason": "", "leave_note": ""})
+
+    def test_teacher_is_offered_only_their_sections(self):
+        self.client.force_login(self.teacher_user)
+        html = self.client.get("/academics/students/new/").content.decode()
+        self.assertIn(f'value="{self.mine.pk}"', html)
+        self.assertNotIn(f'value="{self.other.pk}"', html)
+
+    def test_teacher_cannot_post_a_student_into_another_class(self):
+        self.client.force_login(self.teacher_user)
+        response = self.post_student(self.other)
+        self.assertEqual(response.status_code, 200)          # form redisplayed with an error
+        self.assertFalse(Student.objects.filter(admission_no="N-1").exists())
+
+    def test_teacher_can_add_into_their_own_class(self):
+        self.client.force_login(self.teacher_user)
+        self.assertEqual(self.post_student(self.mine).status_code, 302)
+        self.assertEqual(Student.objects.get(admission_no="N-1").roll_no, "N-1")
+
+    def test_teacher_with_no_classes_is_told_so(self):
+        ClassAccess.objects.all().delete()
+        self.client.force_login(self.teacher_user)
+        html = self.client.get("/academics/students/new/").content.decode()
+        self.assertIn("No classes are assigned to you yet", html)
+        self.assertEqual(self.post_student(self.mine).status_code, 200)
+        self.assertFalse(Student.objects.exists())
+
+    def test_admin_sees_every_section_grouped_by_class(self):
+        self.client.force_login(self.admin)
+        html = self.client.get("/academics/students/new/").content.decode()
+        self.assertIn('<optgroup label="Six">', html)
+        self.assertIn('<optgroup label="Two">', html)
+
+    def test_unticking_on_the_roll_uses_the_proper_leaving_path(self):
+        student = Student.objects.create(admission_no="S-1", full_name="Kid",
+                                         section=self.mine, device_user_id="44")
+        from devices.models import Device, DeviceCommand
+        Device.objects.create(serial_number="SIM", name="Gate", purpose="STUDENT")
+        self.client.force_login(self.admin)
+        self.client.post(f"/academics/students/{student.pk}/", {
+            "full_name": "Kid", "admission_no": "S-1", "roll_no": "S-1",
+            "section": self.mine.pk, "guardian_name": "", "guardian_phone": "",
+            "student_phone": "", "device_user_id": "44", "rfid_number": "",
+            "leave_reason": "TRANSFERRED", "leave_note": "Moved"})
+        student.refresh_from_db()
+        self.assertFalse(student.is_active)
+        self.assertEqual(student.leave_reason, "TRANSFERRED")
+        self.assertTrue(DeviceCommand.objects.filter(cmd_code="DELETE_USER").exists())
+
+    def test_teacher_form_saves_class_access(self):
+        self.client.force_login(self.admin)
+        two = self.other.school_class
+        self.client.post(f"/academics/teachers/{self.teacher.pk}/", {
+            "full_name": "Naeem", "employee_code": "T-9", "designation": "", "campus": "",
+            "phone": "", "joined_on": "", "device_user_id": "", "is_active": "on",
+            "access_classes": [str(two.pk)], "access_sections": []})
+        grants = {(g.school_class_id, g.section_id) for g in self.teacher.class_access.all()}
+        self.assertEqual(grants, {(two.pk, None)})     # Six A removed, all of Two added
+        self.assertEqual(set(self.teacher.allowed_section_ids()), {self.other.pk})
+
+    def test_change_password_left_the_sidebar_for_the_topbar(self):
+        self.client.force_login(self.admin)
+        html = self.client.get("/").content.decode()
+        sidebar = html.split('<nav class="sidebar"')[1].split("</nav>")[0]
+        self.assertNotIn("Change password", sidebar)
+        self.assertIn("/password/", html.split('class="topbar"')[1])

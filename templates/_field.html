@@ -1,0 +1,11 @@
+{# One form field: label, control, help, error. `wide` spans both columns. #}
+<div class="ff{% if wide %} ff-wide{% endif %}{% if field.errors %} ff-error{% endif %}">
+  {% if field.field.widget.input_type == "checkbox" %}
+    <label class="ff-check">{{ field }} <span>{{ field.label }}</span></label>
+  {% else %}
+    <label for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %} <span class="req" aria-hidden="true">*</span>{% endif %}</label>
+    {{ field }}
+  {% endif %}
+  {% if field.errors %}<div class="errors" role="alert">{{ field.errors|striptags }}</div>
+  {% elif field.help_text %}<div class="help">{{ field.help_text }}</div>{% endif %}
+</div>

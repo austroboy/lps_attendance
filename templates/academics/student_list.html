@@ -9,7 +9,7 @@
   <div class="btn-row">
     <a class="btn ghost" href="{% querystring export=1 %}">Export CSV</a>
     {% if nav_is_admin %}<a class="btn ghost" href="{% url 'academics:student_import' %}">Import</a>{% endif %}
-    <a class="btn" href="{% url 'academics:student_new' %}">Add student</a>
+    {% if can_add %}<a class="btn" href="{% url 'academics:student_new' %}">Add student</a>{% endif %}
   </div>
 </div>
 

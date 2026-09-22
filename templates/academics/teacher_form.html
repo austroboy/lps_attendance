@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>{% if teacher %}{{ teacher.full_name }}{% else %}Add teacher{% endif %}</h1>
+    {% if teacher %}<p>{{ teacher.employee_code }}{% if teacher.designation %} · {{ teacher.designation }}{% endif %}{% if teacher.campus %} · {{ teacher.campus }}{% endif %}</p>{% endif %}
+  </div>
+  <a class="btn ghost" href="{% url 'academics:teacher_list' %}">Back to teachers</a>
+</div>
+
+<form method="post" class="sheet" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}<div class="notice error">{{ form.non_field_errors|striptags }}</div>{% endif %}
+
+  <section class="sheet-part">
+    <h2>Teacher</h2>
+    <div class="ff-grid">
+      {% include "_field.html" with field=form.full_name wide=True %}
+      {% include "_field.html" with field=form.employee_code %}
+      {% include "_field.html" with field=form.designation %}
+      {% include "_field.html" with field=form.campus %}
+      {% include "_field.html" with field=form.phone %}
+      {% include "_field.html" with field=form.joined_on %}
+    </div>
+    <datalist id="campus-options">{% for c in form.campus_options %}<option value="{{ c }}">{% endfor %}</datalist>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Classes this teacher looks after</h2>
+    <p class="muted">They see and manage only these students — the register, the roster, face
+      enrolment and removing a student. Tick a whole class, or open it and pick sections.</p>
+    {% if form.access_tree %}
+    <div class="access-list">
+      {% for row in form.access_tree %}
+        <details class="access-class"{% if row.whole or row.count %} open{% endif %}>
+          <summary>
+            <span class="access-name">{{ row.cls.name }}</span>
+            <span class="access-count">{% if row.whole %}Whole class{% elif row.count %}{{ row.count }} section{{ row.count|pluralize }}{% else %}—{% endif %}</span>
+          </summary>
+          <div class="access-body">
+            <label class="ff-check access-whole">
+              <input type="checkbox" name="access_classes" value="{{ row.cls.pk }}" {% if row.whole %}checked{% endif %}>
+              <span>All of {{ row.cls.name }}, including sections added later</span>
+            </label>
+            <div class="access-sections">
+              {% for item in row.sections %}
+                <label class="ff-check">
+                  <input type="checkbox" name="access_sections" value="{{ item.section.pk }}" {% if item.checked %}checked{% endif %}>
+                  <span>{{ item.section.label_in_class }}</span>
+                </label>
+              {% endfor %}
+            </div>
+          </div>
+        </details>
+      {% endfor %}
+    </div>
+    {% else %}
+      <p class="muted">No classes exist yet. Import students first; classes are created from the file.</p>
+    {% endif %}
+  </section>
+
+  <section class="sheet-part">
+    <h2>Attendance terminal</h2>
+    <div class="ff-grid">{% include "_field.html" with field=form.device_user_id %}</div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Status</h2>
+    <div class="ff-grid">{% include "_field.html" with field=form.is_active wide=True %}</div>
+  </section>
+
+  <section class="sheet-part">
+    <h2>Login</h2>
+    {% if form.has_login %}
+      <p class="ff-static">Signs in as <span class="mono">{{ teacher.user.username }}</span>.</p>
+    {% else %}
+      <div class="ff-grid">{% include "_field.html" with field=form.create_login wide=True %}</div>
+    {% endif %}
+  </section>
+
+  <div class="sheet-actions">
+    <button class="btn" type="submit">{% if teacher %}Save changes{% else %}Add teacher{% endif %}</button>
+    <a class="btn ghost" href="{% url 'academics:teacher_list' %}">Cancel</a>
+  </div>
+</form>
+{% endblock %}

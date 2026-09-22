@@ -112,6 +112,14 @@ class Section(models.Model):
     def label(self):
         return str(self)
 
+    @property
+    def label_in_class(self):
+        """The section as it reads once you already know the class: 'Daffodil (English, Morning)'."""
+        name = f"{self.group.name} - {self.name}" if self.group_id else self.name
+        tags = [t for t in (self.version.name if self.version_id else None,
+                            self.shift.name if self.shift_id else None) if t]
+        return f"{name} ({', '.join(tags)})" if tags else name
+
 
 class Teacher(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,

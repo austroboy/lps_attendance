@@ -58,24 +58,221 @@ class GroupForm(StyledFormMixin, forms.ModelForm):
         fields = ["name", "order"]
 
 
+def grouped_section_choices(queryset, blank="Choose a class and section"):
+    """
+    Sections as <optgroup>s by class.
+
+    A flat list of 149 entries like "Two - Meghna (Bangla, Morning)" is a
+    scroll-and-squint exercise; grouped under their class it is a glance.
+    Display only — validation still runs against the queryset, so a teacher
+    cannot post a section they were not offered.
+    """
+    groups, current, bucket = [], None, []
+    for section in queryset.select_related("school_class", "shift", "version", "group"):
+        if section.school_class_id != current:
+            if bucket:
+                groups.append((bucket_name, bucket))
+            current, bucket_name, bucket = section.school_class_id, section.school_class.name, []
+        # The full name, not just the part after the class: a closed <select>
+        # shows only the option text, and "A" alone could be any class.
+        bucket.append((section.pk, str(section)))
+    if bucket:
+        groups.append((bucket_name, bucket))
+    return [("", blank)] + groups
+
+
+class StudentForm(StyledFormMixin, forms.ModelForm):
+    create_login = forms.BooleanField(
+        required=False, initial=False,
+        label="Create a login for this student",
+        help_text="Username and first password: the roll number.")
+
+    class Meta:
+        model = Student
+        fields = ["full_name", "admission_no", "roll_no", "section",
+                  "guardian_name", "guardian_phone", "student_phone",
+                  "device_user_id", "rfid_number", "photo",
+                  "is_active", "leave_reason", "leave_note"]
+        labels = {
+            "admission_no": "Admission number",
+            "roll_no": "Roll number",
+            "section": "Class and section",
+            "device_user_id": "Terminal user ID",
+            "rfid_number": "Card number (RFID)",
+            "is_active": "On the roll",
+            "leave_reason": "Reason for leaving",
+            "leave_note": "Note",
+            "photo": "Upload a new photo",
+        }
+        help_texts = {
+            "roll_no": "Leave blank to use the admission number.",
+            "guardian_phone": "Attendance SMS goes to this number. 01XXXXXXXXX.",
+            "device_user_id": "Filled in automatically when you enrol the face from the Students page.",
+            "rfid_number": "Scan the card here, or type it.",
+            "is_active": "Untick for a student who has left. Their history is kept.",
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+        sections = Section.objects.all()
+        allowed = user.allowed_section_ids() if user is not None else None
+        if allowed is not None:
+            # A teacher only ever sees — and can only ever save — their own sections.
+            sections = sections.filter(pk__in=allowed)
+        self.fields["section"].queryset = sections
+        self.fields["section"].choices = grouped_section_choices(sections)
+        self.fields["photo"].widget = forms.FileInput(attrs={"accept": "image/*"})
+        self.fields["leave_note"].widget = forms.TextInput(attrs={"class": "field"})
+        self.has_login = bool(self.instance.pk and self.instance.user_id)
+        if self.has_login:
+            del self.fields["create_login"]
+        self._was_active = self.instance.is_active if self.instance.pk else True
+        self._old_rfid = self.instance.rfid_number if self.instance.pk else ""
+
+    def clean_rfid_number(self):
+        value = "".join(ch for ch in (self.cleaned_data.get("rfid_number") or "")
+                        if ch.isalnum()).upper()[:32]
+        if value:
+            clash = (Student.objects.filter(rfid_number=value)
+                     .exclude(pk=self.instance.pk).select_related("section").first())
+            if clash:
+                raise forms.ValidationError(
+                    f"That card is already on {clash.full_name} ({clash.section}).")
+        return value
+
+    def save(self, commit=True):
+        from .roster import deactivate, reactivate, set_rfid
+
+        student = super().save(commit=False)
+        now_active = student.is_active
+        # Leaving and returning go through the same path as the Students page,
+        # so the terminals are updated too — not just this row.
+        student.is_active = self._was_active
+        new_rfid, student.rfid_number = student.rfid_number, self._old_rfid
+        student.save()
+
+        if self._was_active and not now_active:
+            deactivate(student, reason=self.cleaned_data.get("leave_reason", ""),
+                       note=self.cleaned_data.get("leave_note", ""), by=self.user)
+        elif not self._was_active and now_active:
+            reactivate(student, by=self.user)
+        if new_rfid != self._old_rfid:
+            set_rfid(student, new_rfid)
+
+        if self.cleaned_data.get("create_login") and not student.user_id:
+            login = student.roll_no or student.admission_no
+            user, created = User.objects.get_or_create(
+                username=login,
+                defaults={"role": Role.STUDENT, "first_name": student.full_name[:150],
+                          "must_change_password": True},
+            )
+            if created:
+                user.set_password(login)
+                user.save()
+            student.user = user
+            student.save(update_fields=["user"])
+        return student
+
+
 class TeacherForm(StyledFormMixin, forms.ModelForm):
     create_login = forms.BooleanField(
-        required=False, initial=True,
+        required=False, initial=False,
         label="Create a login for this teacher",
-        help_text="Username is the employee code. First password is the employee code too.")
+        help_text="Username and first password: the employee code.")
+    access_classes = forms.MultipleChoiceField(required=False,
+                                               widget=forms.CheckboxSelectMultiple)
+    access_sections = forms.MultipleChoiceField(required=False,
+                                                widget=forms.CheckboxSelectMultiple)
 
     class Meta:
         model = Teacher
-        fields = ["employee_code", "full_name", "designation", "campus", "phone",
-                  "device_user_id", "is_active", "joined_on"]
+        fields = ["full_name", "employee_code", "designation", "campus", "phone",
+                  "joined_on", "device_user_id", "is_active"]
         widgets = {"joined_on": DateInput()}
+        labels = {
+            "employee_code": "Employee code",
+            "joined_on": "Joining date",
+            "device_user_id": "Terminal user ID",
+            "is_active": "Currently teaching here",
+        }
+        help_texts = {
+            "employee_code": "Stays the same on every upload — it is how this teacher is recognised.",
+            "device_user_id": "The number this teacher is enrolled under on the attendance terminal.",
+            "campus": "",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.sections = list(Section.objects.select_related(
+            "school_class", "shift", "version", "group"))
+        self.classes = list(SchoolClass.objects.all())
+        self.fields["access_classes"].choices = [(str(c.pk), c.name) for c in self.classes]
+        self.fields["access_sections"].choices = [(str(s.pk), str(s)) for s in self.sections]
+        self.fields["campus"].widget.attrs["list"] = "campus-options"
+        self.campus_options = list(Teacher.objects.exclude(campus="")
+                                   .values_list("campus", flat=True).distinct().order_by("campus"))
+
+        whole, parts = set(), set()
+        if self.instance.pk:
+            for grant in self.instance.class_access.all():
+                if grant.section_id:
+                    parts.add(str(grant.section_id))
+                else:
+                    whole.add(str(grant.school_class_id))
+        if self.is_bound:
+            whole = set(self.data.getlist("access_classes"))
+            parts = set(self.data.getlist("access_sections"))
+        self._whole, self._parts = whole, parts
+
+        self.has_login = bool(self.instance.pk and self.instance.user_id)
+        if self.has_login:
+            del self.fields["create_login"]
+
+    def access_tree(self):
+        """Classes, each with its sections, and what is ticked — for the template."""
+        by_class = {}
+        for section in self.sections:
+            by_class.setdefault(section.school_class_id, []).append(section)
+        tree = []
+        for cls in self.classes:
+            sections = by_class.get(cls.pk, [])
+            chosen = [s for s in sections if str(s.pk) in self._parts]
+            tree.append({
+                "cls": cls,
+                "whole": str(cls.pk) in self._whole,
+                "sections": [{"section": s, "checked": str(s.pk) in self._parts} for s in sections],
+                "count": len(chosen),
+            })
+        return tree
 
     def save(self, commit=True):
         teacher = super().save(commit=commit)
+        whole = {int(x) for x in self.cleaned_data.get("access_classes", [])}
+        parts = {int(x) for x in self.cleaned_data.get("access_sections", [])}
+        section_class = {s.pk: s.school_class_id for s in self.sections}
+
+        existing = list(teacher.class_access.all())
+        keep = set()
+        for grant in existing:
+            key = ("s", grant.section_id) if grant.section_id else ("c", grant.school_class_id)
+            wanted = (grant.section_id in parts) if grant.section_id else (grant.school_class_id in whole)
+            if wanted:
+                keep.add(key)
+            else:
+                grant.delete()
+        for class_id in whole:
+            if ("c", class_id) not in keep:
+                ClassAccess.objects.create(teacher=teacher, school_class_id=class_id)
+        for section_id in parts:
+            if ("s", section_id) not in keep:
+                ClassAccess.objects.create(teacher=teacher, section_id=section_id,
+                                           school_class_id=section_class[section_id])
+
         if self.cleaned_data.get("create_login") and not teacher.user_id:
             user, created = User.objects.get_or_create(
                 username=teacher.employee_code,
-                defaults={"role": Role.TEACHER, "first_name": teacher.full_name[:30],
+                defaults={"role": Role.TEACHER, "first_name": teacher.full_name[:150],
                           "phone": teacher.phone, "must_change_password": True},
             )
             if created:
@@ -84,33 +281,6 @@ class TeacherForm(StyledFormMixin, forms.ModelForm):
             teacher.user = user
             teacher.save(update_fields=["user"])
         return teacher
-
-
-class StudentForm(StyledFormMixin, forms.ModelForm):
-    create_login = forms.BooleanField(
-        required=False, initial=True,
-        label="Create a login for this student",
-        help_text="Username is the admission number. First password is the admission number too.")
-
-    class Meta:
-        model = Student
-        fields = ["admission_no", "roll_no", "full_name", "section", "guardian_name",
-                  "guardian_phone", "student_phone", "device_user_id", "photo", "is_active"]
-
-    def save(self, commit=True):
-        student = super().save(commit=commit)
-        if self.cleaned_data.get("create_login") and not student.user_id:
-            user, created = User.objects.get_or_create(
-                username=student.admission_no,
-                defaults={"role": Role.STUDENT, "first_name": student.full_name[:30],
-                          "must_change_password": True},
-            )
-            if created:
-                user.set_password(student.admission_no)
-                user.save()
-            student.user = user
-            student.save(update_fields=["user"])
-        return student
 
 
 class ClassAccessForm(StyledFormMixin, forms.ModelForm):
